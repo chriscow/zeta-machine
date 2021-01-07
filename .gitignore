@@ -1,0 +1,11 @@
+x64
+build
+zeta_machine
+zeta.bmp
+public/tiles/**
+*.tar
+*.tar.gz
+.DS_Store
+.env
+cuda
+.vscode

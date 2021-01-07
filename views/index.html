@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+
+<head>
+    <link rel="stylesheet" href="https://unpkg.com/bulmaswatch/journal/bulmaswatch.min.css">
+    <script defer src="https://use.fontawesome.com/releases/v5.14.0/js/all.js"></script>
+
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"
+        integrity="sha512-xodZBNTC5n17Xt2atTPuE1HxjVMSvLVW9ocqUKLsCC5CXdbqCmblAshOMAS6/keqq/sMZMZ19scR4PsZChSR7A=="
+        crossorigin="" />
+    <!-- Make sure you put this AFTER Leaflet's CSS -->
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"
+        integrity="sha512-XQoYMqMTK8LvdxXYG3nZ448hOEQiglfqkJs1NOQV44cWnUrBc8PkAOcXy20w0vlaXaVUearIOBhiXZ5V3ynxwA=="
+        crossorigin=""></script>
+
+
+
+    <style>
+        html,
+        body {
+            height: 100%;
+            margin: 0;
+        }
+
+        .box {
+            display: flex;
+            flex-flow: column;
+            height: 100%;
+        }
+
+        .box .row {
+            /* border: 1px dotted #0313fc; */
+        }
+
+        .box .row.header {
+            flex: 0 1 auto;
+        }
+
+        .box .row.content {
+            flex: 1 1 auto;
+        }
+
+        .box .row.footer {
+            flex: 0 1 40px;
+        }
+
+        .leaflet-container {
+            /* background: #003cff; */
+            background: #333;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="box">
+        <div class="row header">Shift-drag, scroll-wheel or double-click to zoom</div>
+        <div class="row header">
+            <form id="f" style="display:inline-flex">
+                <label class="label" for="real">Real:
+                    <input class="input" onfocus="this.select();" id="real" value="0" />
+                </label>
+                <label class="label" for="imag">Imag:
+                    <input class="input" id="imag" onfocus="this.select();" value="0" />
+                </label>
+                <label class="label" for="zoom">Zoom
+                    <input class="input" id="zoom" onfocus="this.select();" value="0" />
+                </label>
+                <button type="submit" style="display:none">Go</button>
+            </form>
+        </div>
+        <div class="row content" id="mapid"></div>
+    </div>
+
+    <script>
+        const $id = id => {
+            return document.getElementById(id)
+        }
+
+        const defaultCenter = [0,0],
+            defaultZoom = 0,
+            tileSize = 256,
+            low = [Number.MIN_SAFE_INTEGER, -50], // coordinate range for tile layer to just limit +/- 30
+            high = [Number.MAX_SAFE_INTEGER, 50],
+            bounds = [low, high]
+
+            
+        const zetaMap = L.map('mapid', {crs: L.CRS.Simple})
+        
+        zetaMap.setView(defaultCenter, defaultZoom)
+        
+        $id("real").value = defaultCenter[1]
+        $id("imag").value = defaultCenter[0]
+        $id("zoom").value = defaultZoom
+
+        L.tileLayer('http://{s}.{{.host}}/tile/{z}/{y}/{x}/', {
+            minZoom: 0,
+            maxZoom: 40,
+            tileSize: tileSize,
+            detectRetina: true,
+            // bounds: bounds,
+            subdomains: '{{.subdomains}}'
+        }).addTo(zetaMap)
+
+        L.marker(defaultCenter, {title:'origin'}).addTo(zetaMap);
+        L.marker([0,1], {title:'[1,0]'}).addTo(zetaMap);
+        L.marker([0, 20], {title:'[20,0]'}).addTo(zetaMap);
+        L.marker([14.2, .5], {title:'Zeta 0'}).addTo(zetaMap);
+
+        zetaMap.on('zoom', e => {
+            $id("zoom").value = zetaMap.getZoom()
+        })
+
+        zetaMap.on('move', e => {
+            let center = zetaMap.getCenter()
+
+            $id("real").value = center.lng
+            $id("imag").value = center.lat
+        })
+
+        let form = $id("f")
+        if (form.attachEvent) {
+            form.attachEvent('submit', processForm)
+        } else {
+            form.addEventListener('submit', processForm)
+        }
+
+        function processForm(e) {
+            if (e.preventDefault)
+                e.preventDefault()
+
+            let zoom = parseInt($id("zoom").value),
+                real = parseFloat($id("real").value),
+                imag = parseFloat($id("imag").value)
+
+            var marker = L.marker([imag, real]).addTo(zetaMap);
+
+            zetaMap.setView([imag, real], zoom)
+            return false
+        }
+
+    </script>
+</body>
