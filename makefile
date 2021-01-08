@@ -1,6 +1,6 @@
 OUTDIR = build
 
-all: web
+all: web seed lambda
 
 clean:
 	rm -rf $(OUTDIR)
@@ -12,5 +12,11 @@ lut:
 cuda: lut
 	nvcc -o $(OUTDIR)/zeta_machine cuda/main.cu cuda/zeta.cu
 
-web: cuda
-	go build -o $(OUTDIR)/zeta_web ./apps/web/main.go
+web: 
+	go build -o $(OUTDIR)/webz ./cmd/web/main.go
+
+lambda:
+	go build -o $(OUTDIR)/lambdaz ./cmd/lambda/main.go
+
+seed: 
+	go build -o $(OUTDIR)/seedz ./cmd/seed/main.go

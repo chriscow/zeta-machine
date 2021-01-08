@@ -1,13 +1,45 @@
 package zeta
 
 import (
-	"image"
+	"fmt"
 	"image/color"
+	"log"
 	"math"
 	"math/cmplx"
 	"runtime"
 	"sync"
+	"time"
 )
+
+// func DumpPalette() {
+// 	fmt.Println("var Original = []color.Color{")
+// 	for i := 0; i < len(cc); i += 3 {
+// 		fmt.Printf("\tcolor.RGBA{0x%s, 0x%s, 0x%s, 0xff},\n",
+// 			strconv.FormatInt(int64(cc[i]), 16),
+// 			strconv.FormatInt(int64(cc[i+1]), 16),
+// 			strconv.FormatInt(int64(cc[i+2]), 16))
+// 	}
+
+// 	for i := len(cc) / 3; i < 256; i++ {
+// 		fmt.Printf("\tcolor.RGBA{0xff, 0x00, 0xff, 0xff},\n")
+// 	}
+// 	fmt.Println("}")
+// }
+var reverse map[color.RGBA]uint8
+
+func init() {
+	reverse := make(map[color.RGBA]uint8)
+	for i := 0; i < len(cc); i += 3 {
+		col := color.RGBA{
+			R: cc[i],
+			G: cc[i+1],
+			B: cc[i+2],
+			A: 255,
+		}
+
+		reverse[col] = uint8(i)
+	}
+}
 
 const (
 	minN     = 100
@@ -63,114 +95,92 @@ var (
 
 // Algo ...
 type Algo struct {
-	size   int
+	ppu    int
 	stride int
-	img    *image.RGBA
+	data   []uint8
+	luts   []*LUT
 	wg     *sync.WaitGroup
 }
 
-// Render ...
-func (a *Algo) Render(min, max complex128, img *image.RGBA) {
+// Compute ...
+func (a *Algo) Compute(min, max complex128, luts []*LUT) []uint8 {
 	procs := runtime.GOMAXPROCS(0)
-
-	a.img = img
+	a.ppu = int(float64(TileWidth) / (real(max - min)))
+	a.data = make([]uint8, TileWidth*TileWidth)
+	a.luts = luts
 	a.wg = &sync.WaitGroup{}
-	a.size = img.Rect.Size().X
-	a.stride = a.size * a.size / procs // pixels per proc
+	a.stride = len(a.data) / procs // pixels per proc
 
-	for start := 0; start < a.size*a.size; start += a.stride {
+	jobID := 0
+	for start := 0; start < len(a.data); start += a.stride {
 		a.wg.Add(1)
-		go a.renderPatch(min, max, start)
-		// go func(id, i int) {
-		// 	// fmt.Println("running job", id, "block size", stride)
-		// 	for pos := i; pos < i+stride; pos++ {
-		// 		x := pos % a.Size
-		// 		y := pos / a.Size
-		// 		u := float64(x) / float64(a.Size)
-		// 		v := float64(y) / float64(a.Size)
-
-		// 		span := a.Max - a.Min
-
-		// 		fmt.Println("job", id, "on pos", pos, x, y)
-		// 		// delta := 1.0 / float64(a.Res)
-
-		// 		s := a.Min + complex(real(span)*u, imag(span)*v)
-
-		// 		var col color.RGBA
-		// 		if a.LUTs == nil {
-		// 			its := iterate(s, 1e-15)
-		// 			col = color.RGBA{
-		// 				R: cc[its*3+0],
-		// 				G: cc[its*3+1],
-		// 				B: cc[its*3+2],
-		// 				A: 255,
-		// 			}
-		// 		} else {
-		// 			z := zeta(s)
-		// 			for l := range a.LUTs {
-		// 				if c, ok := a.LUTs[l].Lookup(z); ok {
-		// 					col = c
-		// 					break
-		// 				}
-		// 			}
-		// 		}
-
-		// 		img.Set(x, y, col)
-		// 	}
-		// 	fmt.Println(id, "job complete")
-		// 	<-sem
-		// 	wg.Done()
-		// }(jobid, index)
-
+		go a.computePatch(jobID, start, min, max)
+		jobID++
 	}
 
+	fmt.Println("Computing", min, max, "with", jobID, "jobs")
 	a.wg.Wait()
+	log.Println("")
+	return a.data
 }
 
-// RunSync ...
-func (a *Algo) renderPatch(min, max complex128, start int) {
+// computePatch ...
+func (a *Algo) computePatch(jobID, start int, min, max complex128) {
 	defer a.wg.Done()
 
+	ts := time.Now()
+
+	fmt.Println("\t", jobID, min, max, "starting")
 	span := max - min
-	// ppu := float64(a.size) / real(span)
 
 	for index := start; index < start+a.stride; index++ {
-		x := index % a.size
-		y := index / a.size
-		u := float64(x) / float64(a.size)
-		v := float64(y) / float64(a.size)
+		x := index % TileWidth
+		y := index / TileWidth
+		u := float64(x) / float64(TileWidth)
+		v := float64(y) / float64(TileWidth)
 		s := min + complex(real(span)*u, imag(span)*v)
 
-		col := color.RGBA{
-			R: 255,
-			G: 0,
-			B: 255,
-			A: 255,
-		}
+		var its uint8
 
-		// if a.LUTs == nil {
-		its := iterate(s, 1e-15)
-		col = color.RGBA{
-			R: cc[its*3+0],
-			G: cc[its*3+1],
-			B: cc[its*3+2],
-			A: 255,
-		}
-		// } else {
-		// 	z := zeta(s)
-		// 	for l := range a.LUTs {
-		// 		if c, ok := a.LUTs[l].Lookup(z); ok {
-		// 			col = c
-		// 			break
-		// 		}
-		// 	}
-		// }
+		if a.luts == nil {
+			its = iterate(s, 1e-15)
+		} else {
+			z := zeta(s)
+			for l := range a.luts {
+				if c, ok := a.luts[l].Lookup(z, a.ppu); ok {
+					tmp := iterate(s, 1e-15)
 
-		a.img.Set(x, y, col)
+					check := color.RGBA{
+						R: cc[tmp*3],
+						G: cc[tmp*3+1],
+						B: cc[tmp*3+2],
+						A: 255,
+					}
+
+					its = reverse[c]
+
+					if check != c {
+						log.Println("color mismatch", c, check)
+					}
+
+					if tmp != its {
+						log.Println("iterations mismatch", its, tmp)
+					}
+
+					panic("lookup tables aren't accurate. multiple iteration values can result in the same color")
+					break
+				} else {
+					its = iterate(s, 1e-15)
+				}
+			}
+		}
+		a.data[index] = its
 	}
+
+	fmt.Println("\t", jobID, min, max, "finished in", time.Since(ts))
 }
 
-func iterate(s complex128, epsilon float64) int {
+func iterate(s complex128, epsilon float64) uint8 {
 	var i int
 	var cabsz float64
 	var diff float64 = 100
@@ -192,7 +202,12 @@ func iterate(s complex128, epsilon float64) int {
 			i += 2
 		}
 	}
-	return i
+
+	if i > 255 {
+		log.Fatal("Iterations overflows uint8. iterations:", i, " s:", s)
+	}
+
+	return uint8(i)
 }
 
 func zeta(s complex128) complex128 {

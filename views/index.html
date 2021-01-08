@@ -76,17 +76,17 @@
             return document.getElementById(id)
         }
 
-        const defaultCenter = [0,0],
+        const pos = [0,0],
             defaultZoom = 0,
-            tileSize = 256,
             low = [Number.MIN_SAFE_INTEGER, -50], // coordinate range for tile layer to just limit +/- 30
             high = [Number.MAX_SAFE_INTEGER, 50],
             bounds = [low, high]
+            tileSize = '{{.tileSize}}'
 
             
         const zetaMap = L.map('mapid', {crs: L.CRS.Simple})
         
-        zetaMap.setView(defaultCenter, defaultZoom)
+        zetaMap.setView(pos, defaultZoom)
         
         $id("real").value = defaultCenter[1]
         $id("imag").value = defaultCenter[0]
@@ -96,15 +96,9 @@
             minZoom: 0,
             maxZoom: 40,
             tileSize: tileSize,
-            detectRetina: true,
-            // bounds: bounds,
+            detectRetina: true, 
             subdomains: '{{.subdomains}}'
         }).addTo(zetaMap)
-
-        L.marker(defaultCenter, {title:'origin'}).addTo(zetaMap);
-        L.marker([0,1], {title:'[1,0]'}).addTo(zetaMap);
-        L.marker([0, 20], {title:'[20,0]'}).addTo(zetaMap);
-        L.marker([14.2, .5], {title:'Zeta 0'}).addTo(zetaMap);
 
         zetaMap.on('zoom', e => {
             $id("zoom").value = zetaMap.getZoom()
@@ -115,6 +109,11 @@
 
             $id("real").value = center.lng
             $id("imag").value = center.lat
+        })
+
+        zetaMap.on('moveend', e => {
+            $id("real").value = pos[0]
+            $id("imag").value = pos[1]
         })
 
         let form = $id("f")
@@ -131,6 +130,8 @@
             let zoom = parseInt($id("zoom").value),
                 real = parseFloat($id("real").value),
                 imag = parseFloat($id("imag").value)
+
+            pos = [real, imag]
 
             var marker = L.marker([imag, real]).addTo(zetaMap);
 

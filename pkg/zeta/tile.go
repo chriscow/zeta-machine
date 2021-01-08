@@ -3,6 +3,7 @@ package zeta
 import (
 	"fmt"
 	"image"
+	"image/color"
 	"math"
 	"net/http"
 	"strconv"
@@ -11,39 +12,45 @@ import (
 )
 
 const (
-	// at 1 pixel per unit how many units do we get and what are the coords
-	totalUnits = 512
-	globalMin  = -256 - 256i
-	tileWidth  = 256 // in pixels
+	// TotalUnits represents the number of units we render at 1 pixel per unit
+	// at zoom level zero
+	TotalUnits = 512
+
+	// GlobalMin is the lower left coordinate for 1 tile at 1 pixel per unit
+	GlobalMin = -256 - 256i
+
+	// TileWidth is the width of a rendered tile in pixels
+	TileWidth = 256
 )
 
 // Tile holds information for generating a single zeta tile at a particular
 // zoom level
 type Tile struct {
-	// Size       int        // size in pixels
-	Zoom int // zoom level
-	X, Y int // tile number
-	// TotalUnits float64    // world extents in 'units' for the entire thing
-	// GlobalMin  complex128 // lower left coordinate where the world starts
-	img *image.RGBA
+	Zoom int    `json:"zoom"`
+	X    int    `json:"x"`
+	Y    int    `json:"y"`
+	Data string `json:"data"`
 }
 
-// NewTile generates a single tile at the given zoom and x / y tile number
-func NewTile(zoom, x, y int) (*image.Image, error) {
+// Render generates a single tile image using the tile's properties
+func (t *Tile) Render(data []uint8, colors []color.Color) (*image.Image, error) {
 
-	// fmt.Println("generating ", t.Zoom, ".", t.X, ".", t.Y, ".png, ", t)
-	t := &Tile{Zoom: zoom, X: x, Y: y}
+	rgba := image.NewNRGBA(image.Rect(0, 0, TileWidth, TileWidth))
 
-	rgba := image.NewRGBA(image.Rect(0, 0, tileWidth, tileWidth))
-
-	algo := &Algo{}
-	algo.Render(t.min(), t.max(), rgba)
-
+	for i := range data {
+		x := i % TileWidth
+		y := i / TileWidth
+		c := data[i]
+		rgba.Set(x, y, colors[c])
+	}
 	var img image.Image = rgba
+
 	return &img, nil
 }
 
-func ParseTileArgs(r *http.Request) (*Tile, error) {
+// RequestToTile parses the URL parameters to get the tile arguments, then it
+// constructs a *Tile instance and returns it
+func RequestToTile(r *http.Request) (*Tile, error) {
 	zoom, err := strconv.Atoi(chi.URLParam(r, "zoom"))
 	if err != nil {
 		return nil, err
@@ -59,12 +66,43 @@ func ParseTileArgs(r *http.Request) (*Tile, error) {
 		return nil, err
 	}
 
-	return &Tile{Zoom: zoom, X: x, Y: y}, nil
+	t := &Tile{Zoom: zoom, X: x, Y: y}
+
+	return t, nil
+}
+
+// PPU returns the resolution of this tile in pixels per unit
+func (t *Tile) PPU() int {
+	return int(float64(TileWidth) / (real(t.Max() - t.Min())))
+}
+
+// IsBackground tries to determine if the tile would be rendered the background
+// color and skips the calculations required so we can simply return a solid
+// color
+func (t *Tile) IsBackground() bool {
+	// tile := tile.Tile{
+	// 	Size:       size,
+	// 	Zoom:       zoom,
+	// 	X:          x,
+	// 	Y:          y,
+	// 	TotalUnits: TotalUnits,
+	// 	GlobalMin:  GlobalMin,
+	// }
+
+	// max := tile.Max()
+	// min := tile.Min()
+	// if zoom > 3 && (real(min) >= 20) {
+	// 	fmt.Println("tile:", x, y, "min:", min)
+	// 	return true
+	// }
+
+	// fmt.Println("zoom:", zoom, "tile:", x, y, "extents:", min, max)
+	return false
 }
 
 // Filename returns the filename for this tile
 func (t *Tile) Filename() string {
-	return fmt.Sprintf("%d.%d.%d.png", t.Zoom, t.Y, t.X)
+	return fmt.Sprintf("%d.%d.%d.dat", t.Zoom, t.Y, t.X)
 }
 
 // Path returns the full relative path to the file
@@ -79,7 +117,7 @@ func (t *Tile) tileCount() float64 {
 }
 
 // Min returns the lower left coordinate in 'units' this tile renders
-func (t *Tile) min() complex128 {
+func (t *Tile) Min() complex128 {
 	// Tile count is always even. Tile 0,0 is in the center so tile
 	// numbers can be negative
 	offset := float64(t.tileCount()) / 2
@@ -87,14 +125,14 @@ func (t *Tile) min() complex128 {
 	y := float64(t.Y) + offset
 	stride := t.units()
 
-	r := real(globalMin) + x*stride
-	i := imag(globalMin) + y*stride
+	r := real(GlobalMin) + x*stride
+	i := imag(GlobalMin) + y*stride
 	return complex(r, i)
 }
 
 // Max returns the upper-right coordinate in 'units' this tile renders
-func (t *Tile) max() complex128 {
-	min := t.min()
+func (t *Tile) Max() complex128 {
+	min := t.Min()
 	stride := t.units()
 
 	r := real(min) + stride
@@ -104,9 +142,9 @@ func (t *Tile) max() complex128 {
 
 // Units is the number of 'units' this tile covers (this is not pixels)
 func (t *Tile) units() float64 {
-	return totalUnits / t.tileCount()
+	return TotalUnits / t.tileCount()
 }
 
 func (t *Tile) String() string {
-	return fmt.Sprint("x:", t.X, " y:", t.Y, " min:", t.min(), " max:", t.max(), " units:", t.units())
+	return fmt.Sprint("x:", t.X, " y:", t.Y, " min:", t.Min(), " max:", t.Max(), " units:", t.units())
 }
