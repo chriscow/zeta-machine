@@ -123,7 +123,7 @@ func (t *Tile) Min() complex128 {
 	offset := float64(t.tileCount()) / 2
 	x := float64(t.X) + offset
 	y := float64(t.Y) + offset
-	stride := t.units()
+	stride := t.Units()
 
 	r := real(GlobalMin) + x*stride
 	i := imag(GlobalMin) + y*stride
@@ -133,7 +133,7 @@ func (t *Tile) Min() complex128 {
 // Max returns the upper-right coordinate in 'units' this tile renders
 func (t *Tile) Max() complex128 {
 	min := t.Min()
-	stride := t.units()
+	stride := t.Units()
 
 	r := real(min) + stride
 	i := imag(min) + stride
@@ -141,10 +141,10 @@ func (t *Tile) Max() complex128 {
 }
 
 // Units is the number of 'units' this tile covers (this is not pixels)
-func (t *Tile) units() float64 {
+func (t *Tile) Units() float64 {
 	return TotalUnits / t.tileCount()
 }
 
 func (t *Tile) String() string {
-	return fmt.Sprint("x:", t.X, " y:", t.Y, " ppu:", t.PPU(), " min:", t.Min(), " max:", t.Max(), " units:", t.units())
+	return fmt.Sprint("zoom:", t.Zoom, " x:", t.X, " y:", t.Y, " ppu:", t.PPU(), " min:", t.Min(), " max:", t.Max(), " units:", t.Units())
 }

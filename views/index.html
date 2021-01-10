@@ -88,8 +88,8 @@
         
         zetaMap.setView(pos, defaultZoom)
         
-        $id("real").value = defaultCenter[1]
-        $id("imag").value = defaultCenter[0]
+        $id("real").value = pos[1]
+        $id("imag").value = pos[0]
         $id("zoom").value = defaultZoom
 
         L.tileLayer('http://{s}.{{.host}}/tile/{z}/{y}/{x}/', {

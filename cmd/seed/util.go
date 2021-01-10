@@ -13,6 +13,7 @@ import (
 func StartConsumer(ctx context.Context, topic, channel string, handler nsq.Handler) error {
 	// Instantiate a consumer that will subscribe to the provided channel.
 	config := nsq.NewConfig()
+	config.MaxInFlight = procs
 	consumer, err := nsq.NewConsumer(topic, channel, config)
 	if err != nil {
 		return err

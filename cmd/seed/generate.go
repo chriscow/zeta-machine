@@ -24,6 +24,8 @@ func (h *generator) HandleMessage(m *nsq.Message) error {
 
 	sem <- true
 	wg.Add(1)
+	defer wg.Done()
+	defer func() { <-sem }()
 
 	tile := &zeta.Tile{}
 	if err := json.Unmarshal(m.Body, tile); err != nil {
@@ -31,32 +33,27 @@ func (h *generator) HandleMessage(m *nsq.Message) error {
 		return err
 	}
 
-	go func(tile *zeta.Tile) {
-		log.Println("Generate requested: ", tile)
-		start := time.Now()
+	log.Println("Generate requested: ", tile)
+	start := time.Now()
 
-		algo := &zeta.Algo{}
+	algo := &zeta.Algo{}
 
-		var data []byte
-		log.Println("Starting compute")
-		data = algo.Compute(tile.Min(), tile.Max(), nil)
-		tile.Data = base64.StdEncoding.EncodeToString(data)
+	var data []byte
+	data = algo.Compute(tile.Min(), tile.Max(), nil)
+	tile.Data = base64.StdEncoding.EncodeToString(data)
 
-		b, err := json.Marshal(tile)
-		if err != nil {
-			log.Println("Failed to marshal tile: ", err)
-			return
-		}
+	b, err := json.Marshal(tile)
+	if err != nil {
+		log.Println("Failed to marshal tile: ", err)
+		return err
+	}
 
-		if err := producer.Publish(storeTopic, b); err != nil {
-			log.Println("Failed to publish results: ", err)
-			return
-		}
+	if err := producer.Publish(storeTopic, b); err != nil {
+		log.Println("Failed to publish results: ", err)
+		return err
+	}
 
-		log.Println("Generate completed: ", tile, "in", time.Since(start))
-		<-sem
-		wg.Done()
-	}(tile)
+	log.Println("Generate completed: ", tile, "in", time.Since(start))
 
 	// Returning a non-nil error will automatically send a REQ command to NSQ to re-queue the message.
 	return nil

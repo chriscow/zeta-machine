@@ -8,7 +8,6 @@ import (
 	"math/cmplx"
 	"runtime"
 	"sync"
-	"time"
 )
 
 // func DumpPalette() {
@@ -128,9 +127,9 @@ func (a *Algo) Compute(min, max complex128, luts []*LUT) []uint8 {
 func (a *Algo) computePatch(jobID, start int, min, max complex128) {
 	defer a.wg.Done()
 
-	ts := time.Now()
+	// ts := time.Now()
 
-	fmt.Println("\t", jobID, min, max, "starting")
+	// fmt.Println("\t", jobID, min, max, "starting")
 	span := max - min
 
 	for index := start; index < start+a.stride; index++ {
@@ -177,7 +176,7 @@ func (a *Algo) computePatch(jobID, start int, min, max complex128) {
 		a.data[index] = its
 	}
 
-	fmt.Println("\t", jobID, min, max, "finished in", time.Since(ts))
+	// fmt.Println("\t", jobID, min, max, "finished in", time.Since(ts))
 }
 
 func iterate(s complex128, epsilon float64) uint8 {
