@@ -146,5 +146,5 @@ func (t *Tile) units() float64 {
 }
 
 func (t *Tile) String() string {
-	return fmt.Sprint("x:", t.X, " y:", t.Y, " min:", t.Min(), " max:", t.Max(), " units:", t.units())
+	return fmt.Sprint("x:", t.X, " y:", t.Y, " ppu:", t.PPU(), " min:", t.Min(), " max:", t.Max(), " units:", t.units())
 }

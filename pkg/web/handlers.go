@@ -111,13 +111,7 @@ func getTileData(tile *zeta.Tile, redo bool) (data []byte, err error) {
 			return nil, err
 		}
 
-		data, err = base64.StdEncoding.DecodeString(tile.Data)
-		if err != nil {
-			log.Println("Failed to decode base64 tile data: ", err)
-			return nil, err
-		}
-
-		if err := saveData(fpath, fname, data); err != nil {
+		if err := SaveData(tile); err != nil {
 			log.Println("Failed to save tile data: ", err)
 			return nil, err
 		}
@@ -126,7 +120,18 @@ func getTileData(tile *zeta.Tile, redo bool) (data []byte, err error) {
 	return data, nil
 }
 
-func saveData(fpath, fname string, data []byte) error {
+// SaveData saves the binary iteration data from a tile
+func SaveData(tile *zeta.Tile) error {
+	cwd, _ := os.Getwd()
+
+	fpath := path.Join(cwd, tile.Path())
+	fname := path.Join(fpath, tile.Filename())
+
+	data, err := base64.StdEncoding.DecodeString(tile.Data)
+	if err != nil {
+		return err
+	}
+
 	// does not return an error if the path exists. creates the path recusively
 	if err := utils.CreateFolder(fpath); err != nil {
 		return err

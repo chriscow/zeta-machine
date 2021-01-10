@@ -7,6 +7,7 @@ require (
 	github.com/foolin/goview v0.3.0
 	github.com/go-chi/chi v1.5.1
 	github.com/joho/godotenv v1.3.0
+	github.com/nsqio/go-nsq v1.0.8
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/urfave/cli/v2 v2.3.0 // indirect
 	github.com/valyala/fasthttp v1.19.0

@@ -1,18 +1,24 @@
 package main
 
 import (
+	"context"
 	"flag"
-	"fmt"
 	"log"
-	"math"
-	"net/http"
 	"os"
+	"os/signal"
 	"runtime"
-	"strconv"
 	"sync"
-	"zetamachine/pkg/zeta"
+	"syscall"
+	"time"
 
 	"github.com/joho/godotenv"
+	"github.com/nsqio/go-nsq"
+)
+
+const (
+	requestTopic = "request-tile"
+	storeTopic   = "store-tile"
+	storeChan    = "store-tile"
 )
 
 var (
@@ -23,7 +29,22 @@ var (
 	host, port  string
 )
 
+var producer *nsq.Producer
+var consumer *nsq.Consumer
+
 func init() {
+	var err error
+	log.Println("creating producer")
+	// Instantiate a producer.
+	config := nsq.NewConfig()
+	producer, err = nsq.NewProducer("127.0.0.1:4150", config)
+	if err != nil {
+		log.Fatal("Could not connect to nsqd: ", err)
+	}
+}
+
+func init() {
+	log.Println("creating globals")
 	procs = runtime.GOMAXPROCS(0)
 
 	godotenv.Load()
@@ -35,58 +56,70 @@ func init() {
 }
 
 func main() {
+	checkEnv()
+
 	zoom := flag.Int("zoom", 8, "zoom level (0-18 typically)")
+	role := flag.String("role", "", "store, request, generate")
 	flag.Parse()
 
-	tileCount = math.Pow(2, float64(*zoom+1))
+	ctx, cancel := context.WithCancel(context.Background())
 
-	center := int(tileCount / 2)
+	wait := true
 
-	for y := 0; y < center; y++ {
-		for x := 0; x < center; x++ {
-			wg.Add(1)
-			sem <- true
-			go reqTile(*zoom, int(x), int(y))
-
-			wg.Add(1)
-			sem <- true
-			go reqTile(*zoom, int(x), int(-y))
-
-			wg.Add(1)
-			sem <- true
-			go reqTile(*zoom, int(-x), int(-y))
-
-			wg.Add(1)
-			sem <- true
-			go reqTile(*zoom, int(-x), int(y))
-
-			t := zeta.Tile{Zoom: *zoom, X: int(x), Y: int(y)}
-			if math.Abs(real(t.Max())) > 5 {
-				break
-			}
-		}
+	switch *role {
+	case "store":
+		handler := &store{}
+		go StartConsumer(ctx, storeTopic, "storeage", handler)
+	case "request":
+		request(*zoom)
+		wait = false
+	case "generate":
+		handler := &generator{}
+		go StartConsumer(ctx, requestTopic, "generator", handler)
+	default:
+		log.Fatal("Unknown role: ", role)
 	}
 
+	if wait {
+		log.Println("Waiting for signal to exit")
+		// wait for signal to exit
+		sigChan := make(chan os.Signal, 1)
+		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+		<-sigChan
+		log.Println("Signaled to exit. Stopping NSQ")
+	}
+
+	cancel()
+
+	if producer != nil {
+		producer.Stop()
+	}
+
+	if consumer != nil {
+		consumer.Stop()
+	}
+
+	log.Println("Waiting for processes to finish...")
 	wg.Wait()
+	log.Println("Processes complete. Stopping.")
+	time.Sleep(2)
 }
 
-func reqTile(zoom, x, y int) {
-	defer func() { <-sem }()
-	defer wg.Done()
+func checkEnv() {
+	godotenv.Load()
 
-	if x == 0 && y == 0 {
-		return
+	if os.Getenv("ZETA_NSQLOOKUP") == "" {
+		log.Fatal("ZETA_NSQLOOKUP environment not set")
 	}
+}
 
-	fmt.Println(zoom, x, y)
-
-	resp, err := http.Get("http://" + host + ":" + port + "/tile/" + strconv.Itoa(zoom) + "/" + strconv.Itoa(y) + "/" + strconv.Itoa(x) + "/")
+func createConsumer(topic, channel string) *nsq.Consumer {
+	// Instantiate a consumer that will subscribe to the provided channel.
+	config := nsq.NewConfig()
+	consumer, err := nsq.NewConsumer(topic, channel, config)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer resp.Body.Close()
 
-	if resp.StatusCode != 200 {
-		log.Fatal(fmt.Sprintf("Received error code %d %s", resp.StatusCode, resp.Status))
-	}
+	return consumer
 }
