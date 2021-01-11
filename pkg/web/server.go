@@ -8,9 +8,11 @@ import (
 	"os"
 	"strings"
 	"time"
+	"zetamachine/pkg/msg"
 	"zetamachine/pkg/zeta"
 
-	"github.com/foolin/goview"
+	"github.com/go-chi/valve"
+
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 	"github.com/joho/godotenv"
@@ -22,6 +24,9 @@ type Server struct {
 	port       string
 	subdomains []string
 	luts       []*zeta.LUT
+	requester  *msg.Requester
+	store      *msg.Store
+	valve      *valve.Valve
 }
 
 // Run reads the configuration from the environment etc., configures routes and
@@ -49,7 +54,10 @@ func (s *Server) Run() error {
 	}
 
 	log.Println("Listening and serving on :" + s.port)
-	return http.ListenAndServe(":"+s.port, r)
+	if http.ListenAndServe(":"+s.port, r) != nil {
+		s.requester.Shutdown()
+	}
+	return err
 }
 
 func (s *Server) config() error {
@@ -60,6 +68,21 @@ func (s *Server) config() error {
 	s.host = os.Getenv("ZETA_HOSTNAME")
 	s.port = os.Getenv("ZETA_PORT")
 	s.subdomains = strings.Split(os.Getenv("ZETA_SUBDOMAINS"), ",")
+	s.valve = valve.New()
+
+	r, err := msg.NewRequester()
+	if err != nil {
+		log.Println("[server] failed creating requester: ", err)
+		return err
+	}
+	s.requester = r
+
+	store, err := msg.NewStore(s.valve)
+	if err != nil {
+		log.Println("[server] failed to create store: ", err)
+		return err
+	}
+	s.store = store
 
 	http.DefaultTransport.(*http.Transport).MaxIdleConnsPerHost = 8
 
@@ -85,25 +108,33 @@ func (s *Server) checkEnv() error {
 		return errors.New("ZETA_SUBDOMAINS is not set")
 	}
 
+	if os.Getenv("ZETA_NSQLOOKUP") == "" {
+		return errors.New("ZETA_NSQLOOKUP is not set")
+	}
+
+	if os.Getenv("ZETA_GENERATE_VIA") == "" {
+		return errors.New("ZETA_GENERATE_VIA is not set")
+	}
+
+	if os.Getenv("ZETA_DEFAULT_ZOOM") == "" {
+		return errors.New("ZETA_DEFAULT_ZOOM is not set")
+	}
+
+	if os.Getenv("ZETA_DEFAULT_REAL") == "" {
+		return errors.New("ZETA_DEFAULT_REAL is not set")
+	}
+
+	if os.Getenv("ZETA_DEFAULT_IMAG") == "" {
+		return errors.New("ZETA_DEFAULT_IMAG is not set")
+	}
+
 	return nil
 }
 
 func (s *Server) routes() (*chi.Mux, error) {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
-	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		goview.DefaultConfig.DisableCache = true
-		err := goview.Render(w, http.StatusOK, "index.html", goview.M{
-			"host":       s.host + ":" + s.port,
-			"subdomains": strings.Join(s.subdomains, ""),
-			"tileSize":   zeta.TileWidth,
-		})
-
-		if err != nil {
-			fmt.Fprintf(w, "Render index error: %v!", err)
-		}
-	})
-
+	r.Get("/", s.serveIndex())
 	r.Get("/tile/{zoom}/{y}/{x}/", s.serveTile())
 	r.Post("/generate/", s.generateTile())
 

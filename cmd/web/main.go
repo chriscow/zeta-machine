@@ -1,7 +1,7 @@
 package main
 
 import (
-	"zetamachine/pkg/web"
+	web "zetamachine/pkg/web"
 )
 
 func main() {

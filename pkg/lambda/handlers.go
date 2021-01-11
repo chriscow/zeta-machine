@@ -1,8 +1,6 @@
 package lambda
 
 import (
-	"bytes"
-	"encoding/base64"
 	"encoding/json"
 	"log"
 	"zetamachine/pkg/zeta"
@@ -18,18 +16,16 @@ func Compute(req events.APIGatewayProxyRequest) (*events.APIGatewayProxyResponse
 		return nil, err
 	}
 
-	algo := &zeta.Algo{}
-	data := algo.Compute(tile.Min(), tile.Max(), nil)
-
-	log.Println("Lambda received:", tile)
-
-	buffer := bytes.NewBuffer(data)
-	b64 := base64.StdEncoding.EncodeToString(buffer.Bytes())
+	jsonb, err := zeta.ComputeRequest([]byte(req.Body), nil)
+	if err != nil {
+		log.Println("Error computing tile: ", err)
+		return nil, err
+	}
 
 	resp := &events.APIGatewayProxyResponse{
-		Headers:    map[string]string{"Content-Type": "text/text"},
+		Headers:    map[string]string{"Content-Type": "application/json"},
 		StatusCode: 200,
-		Body:       b64,
+		Body:       string(jsonb),
 	}
 
 	return resp, nil

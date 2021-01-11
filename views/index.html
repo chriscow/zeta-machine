@@ -66,6 +66,7 @@
                     <input class="input" id="zoom" onfocus="this.select();" value="0" />
                 </label>
                 <button type="submit" style="display:none">Go</button>
+                <!-- <button id="marker" class="column" style="height:80%; margin-top: 2.5%;">Pin</button> -->
             </form>
         </div>
         <div class="row content" id="mapid"></div>
@@ -76,32 +77,70 @@
             return document.getElementById(id)
         }
 
-        const pos = [0,0],
-            defaultZoom = 0,
+        let post = false,
+            zoom = parseInt('{{.zoom}}'),
+            pos = [parseFloat('{{.imag}}'), parseFloat('{{.real}}')],
+            popping = false
+
+        const
             low = [Number.MIN_SAFE_INTEGER, -50], // coordinate range for tile layer to just limit +/- 30
             high = [Number.MAX_SAFE_INTEGER, 50],
             bounds = [low, high]
-            tileSize = '{{.tileSize}}'
+        tileSize = '{{.tileSize}}'
 
-            
-        const zetaMap = L.map('mapid', {crs: L.CRS.Simple})
-        
-        zetaMap.setView(pos, defaultZoom)
-        
+
+        const zetaMap = L.map('mapid', {
+            crs: L.CRS.Simple,
+            zoomDelta: 2,
+        })
+
+        zetaMap.setView(pos, zoom)
         $id("real").value = pos[1]
         $id("imag").value = pos[0]
-        $id("zoom").value = defaultZoom
+        $id("zoom").value = zoom
+
+        // var val = {
+        //     item: Math.random(),
+        //     toString: function(){
+        //         return this.item
+        //     }
+        // }
 
         L.tileLayer('http://{s}.{{.host}}/tile/{z}/{y}/{x}/', {
             minZoom: 0,
             maxZoom: 40,
+            errorTileUrl: 'http://{{.host}}/tile/-1/0/0/',
             tileSize: tileSize,
-            detectRetina: true, 
-            subdomains: '{{.subdomains}}'
+            subdomains: '{{.subdomains}}',
+            // token: val,
         }).addTo(zetaMap)
 
+        window.onpopstate = e => {
+            if (e.state == null) {
+                return
+            }
+            
+            console.log("[onpopstate] state popped:", e.state)
+            popping = true
+            pos = e.state.pos
+            zoom = e.state.zoom
+            zetaMap.setView(pos, zoom)
+        }
+
+        // $id("marker").on('click', e => {
+        //     var marker = L.marker([imag, real]).addTo(zetaMap);
+        // })
+
         zetaMap.on('zoom', e => {
-            $id("zoom").value = zetaMap.getZoom()
+            if (!popping) {
+                $id("zoom").value = zetaMap.getZoom()
+                history.pushState(
+                    { zoom: zetaMap.getZoom(), pos: pos },
+                    "Zeta Machine - Zoom:" + zoom + " Pos:" + pos[1] + "," + pos[0],
+                    "?zoom=" + zoom + "&real=" + pos[1] + "&imag=" + pos[0]
+                )
+                console.log("[zoom] state pushed", zoom, pos)
+            }
         })
 
         zetaMap.on('move', e => {
@@ -112,8 +151,30 @@
         })
 
         zetaMap.on('moveend', e => {
-            $id("real").value = pos[0]
-            $id("imag").value = pos[1]
+            // when the map pans due to a posted form value, the resulting
+            // destination may not be precicely what was asked for but it's 
+            // very close.  To avoid confusion, just set the form values
+            // to what was actually requested after arrival at the destination.
+            if (post) {
+                $id("real").value = pos[1]
+                $id("imag").value = pos[0]
+                post = false
+            } else {
+                const center = zetaMap.getCenter()
+                pos = [center.lat, center.lng]
+            }
+
+            if (!popping) {
+                $id("zoom").value = zetaMap.getZoom()
+                history.pushState(
+                    { zoom: zetaMap.getZoom(), pos: pos },
+                    "Zeta Machine - Zoom:" + zoom + " Pos:" + pos[1] + "," + pos[0],
+                    "?zoom=" + zoom + "&real=" + pos[1] + "&imag=" + pos[0]
+                )
+                console.log("[moveend] state pushed", zoom, pos)
+            }
+
+            popping = false
         })
 
         let form = $id("f")
@@ -127,17 +188,19 @@
             if (e.preventDefault)
                 e.preventDefault()
 
+
             let zoom = parseInt($id("zoom").value),
                 real = parseFloat($id("real").value),
                 imag = parseFloat($id("imag").value)
 
-            pos = [real, imag]
+            pos = [imag, real]
+            post = true
+            console.log("pos:", pos)
 
-            var marker = L.marker([imag, real]).addTo(zetaMap);
 
-            zetaMap.setView([imag, real], zoom)
+
+            zetaMap.setView(pos, zoom)
             return false
         }
-
     </script>
 </body>

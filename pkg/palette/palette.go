@@ -4,6 +4,14 @@ import (
 	"image/color"
 )
 
+var (
+	// DefaultPalette is the default palette used of no other is selected
+	DefaultPalette = Original
+
+	// BackgroundColor is used in the background of the website
+	BackgroundColor = color.RGBA{0x00, 0x3c, 0xff, 0xff}
+)
+
 // Original is a 256-color palette from the original 100-color Zeta Machine
 var Original = []color.Color{
 	color.RGBA{0x0, 0x0, 0x0, 0xff},

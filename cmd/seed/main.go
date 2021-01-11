@@ -1,18 +1,19 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"log"
+	"math"
 	"os"
 	"os/signal"
-	"runtime"
-	"sync"
 	"syscall"
 	"time"
 
+	"zetamachine/pkg/msg"
+	"zetamachine/pkg/zeta"
+
+	"github.com/go-chi/valve"
 	"github.com/joho/godotenv"
-	"github.com/nsqio/go-nsq"
 )
 
 const (
@@ -22,38 +23,10 @@ const (
 )
 
 var (
-	wg          *sync.WaitGroup
-	sem         chan bool
-	procs, zoom int
-	tileCount   float64
-	host, port  string
+	zoom       int
+	tileCount  float64
+	host, port string
 )
-
-var producer *nsq.Producer
-var consumer *nsq.Consumer
-
-func init() {
-	var err error
-	log.Println("creating producer")
-	// Instantiate a producer.
-	config := nsq.NewConfig()
-	producer, err = nsq.NewProducer("127.0.0.1:4150", config)
-	if err != nil {
-		log.Fatal("Could not connect to nsqd: ", err)
-	}
-}
-
-func init() {
-	log.Println("creating globals")
-	procs = runtime.GOMAXPROCS(0)
-
-	godotenv.Load()
-	host = os.Getenv("ZETA_HOSTNAME")
-	port = os.Getenv("ZETA_PORT")
-
-	wg = &sync.WaitGroup{}
-	sem = make(chan bool, procs)
-}
 
 func main() {
 	checkEnv()
@@ -62,20 +35,24 @@ func main() {
 	role := flag.String("role", "", "store, request, generate")
 	flag.Parse()
 
-	ctx, cancel := context.WithCancel(context.Background())
-
+	v := valve.New()
 	wait := true
+
+	var handler msg.Server
+	var err error
 
 	switch *role {
 	case "store":
-		handler := &store{}
-		go StartConsumer(ctx, storeTopic, "storeage", handler)
+		handler, err = msg.NewStore(v)
 	case "request":
-		request(*zoom)
+		handler, err = msg.NewRequester()
+		if err != nil {
+			log.Fatal(err)
+		}
+		bulkRequest(*zoom, handler)
 		wait = false
 	case "generate":
-		handler := &generator{}
-		go StartConsumer(ctx, requestTopic, "generator", handler)
+		handler, err = msg.NewGenerator(v)
 	default:
 		log.Fatal("Unknown role: ", role)
 	}
@@ -89,37 +66,36 @@ func main() {
 		log.Println("Signaled to exit. Stopping NSQ")
 	}
 
-	cancel()
-
-	if producer != nil {
-		producer.Stop()
-	}
-
-	if consumer != nil {
-		consumer.Stop()
-	}
-
 	log.Println("Waiting for processes to finish...")
-	wg.Wait()
+	v.Shutdown(20 * time.Second)
 	log.Println("Processes complete. Stopping.")
-	time.Sleep(2)
 }
 
 func checkEnv() {
 	godotenv.Load()
-
-	if os.Getenv("ZETA_NSQLOOKUP") == "" {
-		log.Fatal("ZETA_NSQLOOKUP environment not set")
-	}
 }
 
-func createConsumer(topic, channel string) *nsq.Consumer {
-	// Instantiate a consumer that will subscribe to the provided channel.
-	config := nsq.NewConfig()
-	consumer, err := nsq.NewConsumer(topic, channel, config)
+func bulkRequest(zoom int, s msg.Server) {
+	log.Println("requesting tiles for zoom: ", zoom)
+
+	r := s.(*msg.Requester)
+	cwd, err := os.Getwd()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("can't get working dir: ", cwd)
 	}
 
-	return consumer
+	tileCount := int(math.Pow(2, float64(zoom+1)))
+	limit := tileCount / (zoom + 2)
+
+	for y := -limit; y < limit; y++ {
+		for x := -limit; x < limit; x++ {
+
+			tile := &zeta.Tile{Zoom: zoom, X: x, Y: y}
+			if err := r.Send(tile); err != nil {
+				log.Fatal(err)
+			}
+
+			log.Println("published request for: ", tile)
+		}
+	}
 }

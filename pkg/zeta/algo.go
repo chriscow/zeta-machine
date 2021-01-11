@@ -27,6 +27,8 @@ import (
 var reverse map[color.RGBA]uint8
 
 func init() {
+
+	// attempting to reverse the color from a lookup table to an iteration
 	reverse := make(map[color.RGBA]uint8)
 	for i := 0; i < len(cc); i += 3 {
 		col := color.RGBA{

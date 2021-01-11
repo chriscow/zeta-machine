@@ -8,27 +8,33 @@ import (
 	"fmt"
 	"image"
 	"image/color"
-	"image/draw"
 	"image/png"
-	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"path"
 	"strconv"
+	"strings"
 	"zetamachine/pkg/palette"
-	"zetamachine/pkg/utils"
 	"zetamachine/pkg/zeta"
+
+	"github.com/foolin/goview"
 )
 
-func isBackground(tile *zeta.Tile, w http.ResponseWriter) bool {
-	if tile.IsBackground() {
-		bkg := color.RGBA{255, 0, 0, 255} // background color of website
-		rgba := image.NewRGBA(image.Rect(0, 0, zeta.TileWidth, zeta.TileWidth))
-		draw.Draw(rgba, rgba.Bounds(), &image.Uniform{bkg}, image.ZP, draw.Src)
+var (
+	// ErrTileQueued is returned if the tile was asynchonously queued for rendering
+	ErrTileQueued = errors.New("Tile queued for rendering")
+)
 
-		var img image.Image = rgba
+// isBlank determines if the tile should be rendered as a blank, solid color tile.
+// Returns true if the response was written and no further action is needed.
+func isBlank(tile *zeta.Tile, w http.ResponseWriter) bool {
+	if tile.IsBackground() || tile.Zoom == -1 {
+		bkg := color.RGBA{0x00, 0x3c, 0xff, 0xff} // background color of website 003cff
+
+		img := tile.RenderSolid(bkg)
+
 		buf := bytes.Buffer{}
 		if err := png.Encode(&buf, img); err != nil {
 			log.Println("Failed to encode background tile: ", err)
@@ -42,9 +48,60 @@ func isBackground(tile *zeta.Tile, w http.ResponseWriter) bool {
 	return false
 }
 
+func (s *Server) serveIndex() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var zoom int
+		var rl, im float64
+		var err error
+
+		zoom, err = strconv.Atoi(os.Getenv("ZETA_DEFAULT_ZOOM"))
+		if err != nil {
+			http.Error(w, "ZETA_DEFAULT_ZOOM invalid environment: "+err.Error(), 500)
+			return
+		}
+
+		rl, err = strconv.ParseFloat(os.Getenv("ZETA_DEFAULT_REAL"), 64)
+		if err != nil {
+			http.Error(w, "ZETA_DEFAULT_REAL invalid environment: "+err.Error(), 500)
+			return
+		}
+
+		im, err = strconv.ParseFloat(os.Getenv("ZETA_DEFAULT_IMAG"), 64)
+		if err != nil {
+			http.Error(w, "ZETA_DEFAULT_IMAG invalid environment: "+err.Error(), 500)
+			return
+		}
+
+		if r.URL.Query().Get("zoom") != "" {
+			zoom, err = strconv.Atoi(r.URL.Query().Get("zoom"))
+		}
+		if r.URL.Query().Get("real") != "" {
+			rl, err = strconv.ParseFloat(r.URL.Query().Get("real"), 64)
+		}
+		if r.URL.Query().Get("imag") != "" {
+			im, err = strconv.ParseFloat(r.URL.Query().Get("imag"), 64)
+		}
+
+		goview.DefaultConfig.DisableCache = true
+		err = goview.Render(w, http.StatusOK, "index.html", goview.M{
+			"host":       s.host + ":" + s.port,
+			"subdomains": strings.Join(s.subdomains, ""),
+			"zoom":       zoom,
+			"real":       rl,
+			"imag":       im,
+			"tileSize":   zeta.TileWidth,
+		})
+
+		if err != nil {
+			fmt.Fprintf(w, "Render index error: %v!", err)
+			http.Error(w, "DEFAULT_IMAG invalid environment: "+err.Error(), 500)
+		}
+	}
+}
+
 func (s *Server) serveTile() http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var img *image.Image
+		var img image.Image
 
 		tile, err := zeta.RequestToTile(r)
 		if err != nil {
@@ -53,30 +110,37 @@ func (s *Server) serveTile() http.HandlerFunc {
 		}
 
 		// don't save tiles that don't contain anything
-		if isBackground(tile, w) {
+		if isBlank(tile, w) {
 			return
 		}
 
 		redo := r.URL.Query().Get("redo") != ""
 
-		data, err := getTileData(tile, redo)
+		data, err := s.getTileData(tile, redo)
 		if err != nil {
-			log.Println("Failed to get tile data: ", err)
-			http.Error(w, err.Error(), 500)
-			return
+			if err == ErrTileQueued {
+				img = tile.RenderSolid(palette.BackgroundColor)
+			} else {
+				log.Println("Failed to get tile data: ", err)
+				http.Error(w, err.Error(), 500)
+				return
+			}
 		}
 
-		// Render the image from the data
-		img, err = tile.Render(data, palette.Original)
-		if err != nil {
-			log.Println("Failed to render tile data: ", err)
-			http.Error(w, err.Error(), 500)
-			return
+		// If an image wasn't rendered above, and we have some data ...
+		if img == nil && data != nil {
+			// Render the image from the data
+			img, err = tile.Render(data, palette.DefaultPalette)
+			if err != nil {
+				log.Println("Failed to render tile data: ", err)
+				http.Error(w, err.Error(), 500)
+				return
+			}
 		}
 
 		// Encode the image to PNG format
 		buffer := new(bytes.Buffer)
-		if err := png.Encode(buffer, *img); err != nil {
+		if err := png.Encode(buffer, img); err != nil {
 			http.Error(w, "Unable to encode image: "+err.Error(), 500)
 			return
 		}
@@ -85,7 +149,7 @@ func (s *Server) serveTile() http.HandlerFunc {
 	})
 }
 
-func getTileData(tile *zeta.Tile, redo bool) (data []byte, err error) {
+func (s *Server) getTileData(tile *zeta.Tile, redo bool) (data []byte, err error) {
 	cwd, _ := os.Getwd()
 
 	fpath := path.Join(cwd, tile.Path())
@@ -106,50 +170,45 @@ func getTileData(tile *zeta.Tile, redo bool) (data []byte, err error) {
 		}
 	} else {
 
-		// png, err := internalLambdaTile(tile)
-		if err := farmItOut(tile); err != nil {
-			return nil, err
-		}
+		// Tile data file does not exist.
 
-		if err := SaveData(tile); err != nil {
-			log.Println("Failed to save tile data: ", err)
-			return nil, err
+		// hires, _ := tile.Downsample()
+		// if hires != nil {
+		// 	tile.Data = hires.Data
+		// } else {
+		// 	lowres, _ := tile.Upsample()
+		// }
+
+		if os.Getenv("ZETA_GENERATE_VIA") == "nsq" {
+			if err := s.reqGenAsync(tile); err != nil {
+				log.Println("[server] Failed to send NSQ generate request: ", err)
+				return nil, err
+			}
+
+			return nil, ErrTileQueued
+
+		} else {
+			// reqGenHTTP alters the passed in tile with the resulting data
+			if err := reqGenHTTP(tile); err != nil {
+				log.Println("[server] Failed to send HTTP generate request: ", err)
+				return nil, err
+			}
+
+			// Save and decode the data
+			if err := tile.Save(); err != nil {
+				log.Println("Failed to save tile data: ", err)
+				return nil, err
+			}
+
+			data, err = base64.StdEncoding.DecodeString(tile.Data)
+			if err != nil {
+				log.Println("Failed to decode tile data: ", err)
+				return nil, err
+			}
 		}
 	}
 
 	return data, nil
-}
-
-// SaveData saves the binary iteration data from a tile
-func SaveData(tile *zeta.Tile) error {
-	cwd, _ := os.Getwd()
-
-	fpath := path.Join(cwd, tile.Path())
-	fname := path.Join(fpath, tile.Filename())
-
-	data, err := base64.StdEncoding.DecodeString(tile.Data)
-	if err != nil {
-		return err
-	}
-
-	// does not return an error if the path exists. creates the path recusively
-	if err := utils.CreateFolder(fpath); err != nil {
-		return err
-	}
-
-	f, err := os.Create(fname)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	r := bytes.NewBuffer(data)
-	_, err = io.Copy(f, r)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 // A generate request comes as a posted Tile JSON, without the encoded image of course.
@@ -164,22 +223,9 @@ func (s *Server) generateTile() http.HandlerFunc {
 			http.Error(w, err.Error(), 500)
 		}
 
-		tile := &zeta.Tile{}
-		if err := json.Unmarshal(b, tile); err != nil {
-			log.Println("Failed to unmarshal tile: ", err)
-			http.Error(w, err.Error(), 500)
-		}
-
-		if err := renderAndEncode(tile, palette.Original, s.luts); err != nil {
-			http.Error(w, err.Error(), 500)
-			return
-		}
-
-		b, err = json.Marshal(tile)
+		b, err = zeta.ComputeRequest(b, s.luts)
 		if err != nil {
-			s := fmt.Sprint("Failed to marshal tile: ", err)
-			log.Println(s)
-			http.Error(w, s, 500)
+			http.Error(w, err.Error(), 500)
 			return
 		}
 
@@ -192,29 +238,6 @@ func (s *Server) generateTile() http.HandlerFunc {
 	})
 }
 
-//
-func renderAndEncode(tile *zeta.Tile, colors []color.Color, luts []*zeta.LUT) error {
-
-	algo := &zeta.Algo{}
-	data := algo.Compute(tile.Min(), tile.Max(), luts)
-
-	img, err := tile.Render(data, colors) // returns NRGBA
-	if err != nil {
-		log.Println("Failed to render image: ", err)
-		return errors.New(fmt.Sprint("Failed to render image: ", err))
-	}
-
-	buffer := new(bytes.Buffer)
-	if err := png.Encode(buffer, *img); err != nil {
-		log.Println("Unable to encode image: ", err)
-		return errors.New(fmt.Sprint("Unable to encode image: ", err))
-	}
-
-	tile.Data = base64.StdEncoding.EncodeToString(data)
-
-	return nil
-}
-
 // writeImage encodes an image 'img' in jpeg format and writes it into ResponseWriter.
 func writePNG(w http.ResponseWriter, b []byte) {
 	w.Header().Set("Content-Type", "image/png")
@@ -225,10 +248,20 @@ func writePNG(w http.ResponseWriter, b []byte) {
 	}
 }
 
-// request the tile to be generated by the render farm. The tile passed in contains
-// only the parameters for generating the tile, not the encoded PNG. That will
-// be contained in the returned value from the remote host.
-func farmItOut(tile *zeta.Tile) error {
+func (s *Server) reqGenAsync(tile *zeta.Tile) error {
+
+	if err := s.requester.Send(tile); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// request the tile via HTTP to be generated by the render farm.
+// The tile passed in contains only the parameters for generating the tile, not
+// the encoded data. The data will be contained in the returned value from
+// the remote host.
+func reqGenHTTP(tile *zeta.Tile) error {
 	url := os.Getenv("ZETA_TILE_GENERATOR_URL")
 
 	buf, err := json.Marshal(tile)
@@ -261,19 +294,4 @@ func farmItOut(tile *zeta.Tile) error {
 	}
 
 	return nil
-}
-
-func getTileBytes(url string) (*bytes.Buffer, error) {
-	resp, err := http.Get(url)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	var buf bytes.Buffer
-	if err := resp.Write(&buf); err != nil {
-		return nil, err
-	}
-
-	return &buf, nil
 }
