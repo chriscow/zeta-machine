@@ -31,40 +31,32 @@ func (r *Requester) Shutdown() {
 }
 
 // Send ...
-func (r *Requester) Send(tile *zeta.Tile) error {
-	exists, err := tile.Exists()
+func (r *Requester) Send(tile *zeta.Tile) (bool, error) {
+	ok, err := tile.ShouldGenerate()
 	if err != nil {
-		return err
+		log.Println("[requeter] could not determine if we should generate: ", tile, err)
+		return ok, err
 	}
 
-	if exists {
-		return nil
-	}
-
-	qm.Lock()
-	defer qm.Unlock()
-
-	if _, ok := queue[tile.Filename()]; ok {
+	if !ok {
 		log.Println("[requester] already requested tile: ", tile, "skipping.")
-		return nil
+		return ok, nil
 	}
-
-	queue[tile.Filename()] = true
 
 	msg, err := json.Marshal(tile)
 	if err != nil {
 		log.Println("[requester] failed to marshal tile: ", tile, "\n\t", err)
-		return err
+		return false, err
 	}
 
 	// Synchronously publish a single message to the specified topic.
 	// Messages can also be sent asynchronously and/or in batches.
-	err = r.producer.Publish(requestTopic, msg)
+	err = r.producer.Publish(RequestTopic, msg)
 	if err != nil {
 		log.Println("[requester] failed to publish message: ", err)
-		return err
+		return false, err
 	}
 
 	log.Println("[requester] tile requested: ", tile)
-	return nil
+	return true, nil
 }

@@ -2,6 +2,7 @@ package zeta
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -16,6 +17,7 @@ import (
 	"os"
 	"path"
 	"strconv"
+	"time"
 	"zetamachine/pkg/utils"
 
 	"github.com/go-chi/chi"
@@ -84,7 +86,7 @@ func RequestToTile(r *http.Request) (*Tile, error) {
 
 // ComputeRequest takes a JSON serialized tile, unmarshals it, computes the
 // iteration data, base64 encodes the data and marshals it all back to JSON
-func ComputeRequest(b []byte, luts []*LUT) ([]byte, error) {
+func ComputeRequest(ctx context.Context, b []byte, luts []*LUT) ([]byte, error) {
 	tile := &Tile{}
 	if err := json.Unmarshal(b, tile); err != nil {
 		return nil, err
@@ -93,8 +95,9 @@ func ComputeRequest(b []byte, luts []*LUT) ([]byte, error) {
 	log.Println("[tile] computing: ", tile)
 
 	algo := &Algo{}
-	data := algo.Compute(tile.Min(), tile.Max(), luts, tile)
+	data := algo.Compute(ctx, tile.Min(), tile.Max(), luts)
 	tile.Data = base64.StdEncoding.EncodeToString(data)
+	log.Println("[tile] compute complete: ", tile)
 
 	return json.Marshal(tile)
 }
@@ -159,6 +162,83 @@ func (t *Tile) Exists() (bool, error) {
 	return utils.PathExists(fname)
 }
 
+// ShouldGenerate checks for the existence of the tile and also for the temp file
+// created when a tile is requested.  If either exists, Requested returns true
+// to avoid re-requesting generation of pre-existing tiles or ones already in
+// the generation queue
+func (t *Tile) ShouldGenerate() (bool, error) {
+	// the tile tile already exists, return not ok
+	exists, err := t.Exists()
+	if err != nil {
+		return false, err
+	}
+
+	// Tile already exists
+	if exists {
+		return false, nil
+	}
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		return false, err
+	}
+
+	if err := utils.CreateFolder(t.Path()); err != nil {
+		log.Println("[ShouldGenerate] failed to create: ", t.Path())
+		log.Println("[ShouldGenerate] failed: ", err)
+		return false, err
+	}
+
+	// see if we already have this tile flagged with a temp file
+	fname := t.Filename() + ".req"
+	fpath := path.Join(cwd, t.Path(), fname)
+	info, err := os.Stat(fpath)
+	if err != nil {
+		if os.IsExist(err) {
+			age := time.Since(info.ModTime())
+			if age.Hours() > 2.0 {
+				// file is old. remove it
+				os.Remove(fpath)
+			}
+			return false, nil
+		}
+
+		if !os.IsNotExist(err) {
+			return false, err
+		}
+	} else {
+		// request file already exists
+		return false, nil
+	}
+
+	f, err := os.Create(fpath)
+	if err != nil {
+		log.Println("[ShouldGenerate] failed to create: ", fpath)
+		log.Println("[ShouldGenerate] failed: ", err)
+		return false, err
+	}
+	defer f.Close()
+
+	return true, nil
+}
+
+// Received is called to remove the temp file that was created when this tile
+// was requested to be generated
+func (t *Tile) Received() {
+	cwd, err := os.Getwd()
+	if err != nil {
+		log.Println("[tile::Received] could not remove tmp file: ", err)
+		return
+	}
+
+	fname := t.Filename() + ".req"
+	fpath := path.Join(cwd, t.Path(), fname)
+	if err := os.Remove(fpath); err != nil {
+		log.Println("[tile::Received] could not remove tmp file: ", err)
+		return
+	}
+}
+
 // tileCount is the number of tiles in each direction required to render
 // at the set zoom level
 func (t *Tile) tileCount() float64 {
@@ -195,7 +275,7 @@ func (t *Tile) Units() float64 {
 }
 
 func (t *Tile) String() string {
-	return fmt.Sprint("zoom:", t.Zoom, " x:", t.X, " y:", t.Y, " ppu:", t.PPU(), " min:", t.Min(), " max:", t.Max(), " units:", t.Units())
+	return fmt.Sprint("zoom:", t.Zoom, " x:", t.X, " y:", t.Y, " ppu:", t.PPU(), " min:", t.Min(), " max:", t.Max(), " units:", t.Units(), " width:", TileWidth)
 }
 
 // Save saves the binary iteration data from a tile

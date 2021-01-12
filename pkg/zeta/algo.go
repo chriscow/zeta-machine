@@ -1,13 +1,14 @@
 package zeta
 
 import (
+	"context"
 	"fmt"
 	"image/color"
 	"log"
 	"math"
 	"math/cmplx"
-	"runtime"
 	"sync"
+	"time"
 )
 
 // func DumpPalette() {
@@ -96,52 +97,60 @@ var (
 
 // Algo ...
 type Algo struct {
-	ppu    int
-	stride int
-	data   []uint8
-	luts   []*LUT
-	wg     *sync.WaitGroup
-	tile   *Tile
+	ppu  int
+	data []uint8
+	luts []*LUT
+	wg   *sync.WaitGroup
 }
 
 // Compute ...
-func (a *Algo) Compute(min, max complex128, luts []*LUT, tile *Tile) []uint8 {
-	procs := runtime.GOMAXPROCS(0)
+func (a *Algo) Compute(ctx context.Context, min, max complex128, luts []*LUT) []uint8 {
 	a.ppu = int(float64(TileWidth) / (real(max - min)))
 	a.data = make([]uint8, TileWidth*TileWidth)
 	a.luts = luts
 	a.wg = &sync.WaitGroup{}
-	a.stride = len(a.data) / procs // pixels per proc
-	a.tile = tile
+
+	stride := TileWidth * TileWidth / 8 // 8 jobs per tile
+	ts := time.Now()
 
 	jobID := 0
-	for start := 0; start < len(a.data); start += a.stride {
+	for start := 0; start < len(a.data); start += stride {
+
+		if start+stride >= len(a.data) {
+			stride = len(a.data) - start
+		}
+
 		a.wg.Add(1)
-		go a.computePatch(jobID, start, min, max)
+		go a.computePatch(ctx, jobID, start, stride, min, max)
 		jobID++
 	}
 
-	fmt.Println("Computing", min, max, "with", jobID, "jobs")
+	fmt.Println("[algo] computing", min, max, "with", jobID, "jobs")
 	a.wg.Wait()
-	log.Println("")
+	log.Println("[algo] tile computed in", time.Since(ts))
 	return a.data
 }
 
 // computePatch ...
-func (a *Algo) computePatch(jobID, start int, min, max complex128) {
+func (a *Algo) computePatch(ctx context.Context, jobID, start, stride int, min, max complex128) {
 	defer a.wg.Done()
 
-	// ts := time.Now()
-
-	fmt.Println("\t", jobID, min, max, "starting tile:", a.tile, " start:", start, " stride:", a.stride, " start+stride:", start+a.stride, " len(data):", len(a.data))
+	ts := time.Now()
 	span := max - min
 
-	for index := start; index < start+a.stride; index++ {
+	for index := start; index < start+stride; index++ {
 		x := index % TileWidth
 		y := index / TileWidth
 		u := float64(x) / float64(TileWidth)
 		v := float64(y) / float64(TileWidth)
 		s := min + complex(real(span)*u, imag(span)*v)
+
+		select {
+		case <-ctx.Done():
+			log.Println("[algo] job", jobID, "aborting")
+			return
+		default:
+		}
 
 		var its uint8
 
@@ -178,18 +187,12 @@ func (a *Algo) computePatch(jobID, start int, min, max complex128) {
 			}
 		}
 
-		if index >= len(a.data) {
-			log.Println("!!")
-			log.Println("!!")
-			log.Println("!!\t", jobID, min, max, "tile:", a.tile, " start:", start, " stride:", a.stride, " start+stride:", start+a.stride, " len(data):", len(a.data), " index:", index)
-			log.Println("!!")
-			log.Println("!!")
-			panic(fmt.Sprintln("!!\tindex out of bounds: ", jobID, min, max, " index:", index, " start:", start, " stride:", a.stride, " start+stride:", start+a.stride, " len(data):", len(a.data)))
-		}
 		a.data[index] = its
 	}
 
-	// fmt.Println("\t", jobID, min, max, "finished in", time.Since(ts))
+	if jobID < 8 {
+		fmt.Println("\t", jobID, min, max, stride, "finished in", time.Since(ts))
+	}
 }
 
 func iterate(s complex128, epsilon float64) uint8 {

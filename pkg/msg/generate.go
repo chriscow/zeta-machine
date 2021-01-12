@@ -1,6 +1,7 @@
 package msg
 
 import (
+	"encoding/json"
 	"log"
 	"runtime"
 	"time"
@@ -30,12 +31,12 @@ func NewGenerator(v *valve.Valve) (*Generator, error) {
 
 	g := &Generator{valve: v, producer: p}
 
-	maxInFlight := 1 // handle this many messages in parallel
-	if runtime.GOMAXPROCS(0) > 16 {
-		maxInFlight = runtime.GOMAXPROCS(0)
-	}
+	// 8 procs per tile.
+	// in flight is how many tiles this box will handle
+	maxInFlight := runtime.GOMAXPROCS(0) / 8
 
-	go StartConsumer(v.Context(), requestTopic, genChan, maxInFlight, g)
+	log.Println("[generate] setting maxInFlight: ", maxInFlight)
+	go StartConsumer(v.Context(), RequestTopic, GenChan, maxInFlight, g)
 
 	return g, nil
 }
@@ -66,10 +67,17 @@ func (g *Generator) HandleMessage(m *nsq.Message) error {
 	done := make(chan bool)
 	ticker := time.NewTicker(time.Second * touchSec)
 
+	tile := &zeta.Tile{}
+	err := json.Unmarshal(m.Body, tile)
+	if err != nil {
+		log.Println("[generate] failed to unmarshal: ", err)
+		return err
+	}
+
 	go func() {
 		defer func() { done <- true }()
 		var err error
-		res, err = zeta.ComputeRequest(m.Body, nil)
+		res, err = zeta.ComputeRequest(g.valve.Context(), m.Body, nil)
 		if err != nil {
 			log.Println("[generate] ComputeRequest failed: ", err)
 			return
@@ -79,7 +87,7 @@ func (g *Generator) HandleMessage(m *nsq.Message) error {
 	for {
 		select {
 		case <-done:
-			if err := g.producer.Publish(storeTopic, res); err != nil {
+			if err := g.producer.Publish(StoreTopic, res); err != nil {
 				log.Println("[generator] failed to publish results: ", err)
 				return err
 			}
@@ -88,6 +96,7 @@ func (g *Generator) HandleMessage(m *nsq.Message) error {
 			return nil
 
 		case <-ticker.C:
+			log.Println("[generator] touching:", tile)
 			m.Touch()
 		}
 	}

@@ -4,28 +4,17 @@ import (
 	"context"
 	"log"
 	"os"
-	"sync"
 
 	"github.com/nsqio/go-nsq"
 )
 
 const (
-	requestTopic = "request-tile"
-	storeTopic   = "store-tile"
-	storeChan    = "store-tile"
-	genChan      = "generate"
+	RequestTopic = "request-tile"
+	StoreTopic   = "store-tile"
+	StoreChan    = "store-tile"
+	GenChan      = "generate"
 	touchSec     = 30 // touch the message every so often
 )
-
-var (
-	queue map[string]bool
-	qm    *sync.Mutex
-)
-
-func init() {
-	queue = make(map[string]bool)
-	qm = &sync.Mutex{}
-}
 
 // Server interface provides a Shutdown method
 type Server interface {

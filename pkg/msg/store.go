@@ -23,8 +23,9 @@ func NewStore(v *valve.Valve) (*Store, error) {
 		valve: v,
 	}
 
+	log.Println("[store] starting consumer on ", StoreTopic, " ", StoreChan)
 	maxInFlight := runtime.GOMAXPROCS(0)
-	go StartConsumer(v.Context(), storeTopic, storeChan, maxInFlight, s)
+	go StartConsumer(v.Context(), StoreTopic, StoreChan, maxInFlight, s)
 
 	return s, nil
 }
@@ -60,20 +61,10 @@ func (s *Store) HandleMessage(m *nsq.Message) error {
 		return err
 	}
 
-	markReceived(tile)
+	tile.Received()
 
 	log.Println("[store] received tile for storage: ", tile)
 
 	// Returning a non-nil error will automatically send a REQ command to NSQ to re-queue the message.
 	return nil
-}
-
-func markReceived(tile *zeta.Tile) {
-	qm.Lock()
-	defer qm.Unlock()
-
-	if _, ok := queue[tile.Filename()]; ok {
-		log.Println("[requester] queued tile complete: ", tile)
-		delete(queue, tile.Filename())
-	}
 }
