@@ -10,6 +10,7 @@ import (
 	"image/color"
 	"image/draw"
 	"io"
+	"log"
 	"math"
 	"net/http"
 	"os"
@@ -89,8 +90,10 @@ func ComputeRequest(b []byte, luts []*LUT) ([]byte, error) {
 		return nil, err
 	}
 
+	log.Println("[tile] computing: ", tile)
+
 	algo := &Algo{}
-	data := algo.Compute(tile.Min(), tile.Max(), luts)
+	data := algo.Compute(tile.Min(), tile.Max(), luts, tile)
 	tile.Data = base64.StdEncoding.EncodeToString(data)
 
 	return json.Marshal(tile)

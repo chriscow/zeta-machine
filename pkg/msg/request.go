@@ -8,8 +8,6 @@ import (
 	"github.com/nsqio/go-nsq"
 )
 
-var queue map[string]bool
-
 // Requester ...
 type Requester struct {
 	producer *nsq.Producer
@@ -24,7 +22,6 @@ func NewRequester() (*Requester, error) {
 		return nil, err
 	}
 
-	queue = make(map[string]bool)
 	return &Requester{producer: p}, nil
 }
 
@@ -43,6 +40,9 @@ func (r *Requester) Send(tile *zeta.Tile) error {
 	if exists {
 		return nil
 	}
+
+	qm.Lock()
+	defer qm.Unlock()
 
 	if _, ok := queue[tile.Filename()]; ok {
 		log.Println("[requester] already requested tile: ", tile, "skipping.")
@@ -65,5 +65,6 @@ func (r *Requester) Send(tile *zeta.Tile) error {
 		return err
 	}
 
+	log.Println("[requester] tile requested: ", tile)
 	return nil
 }

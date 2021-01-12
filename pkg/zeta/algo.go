@@ -101,16 +101,18 @@ type Algo struct {
 	data   []uint8
 	luts   []*LUT
 	wg     *sync.WaitGroup
+	tile   *Tile
 }
 
 // Compute ...
-func (a *Algo) Compute(min, max complex128, luts []*LUT) []uint8 {
+func (a *Algo) Compute(min, max complex128, luts []*LUT, tile *Tile) []uint8 {
 	procs := runtime.GOMAXPROCS(0)
 	a.ppu = int(float64(TileWidth) / (real(max - min)))
 	a.data = make([]uint8, TileWidth*TileWidth)
 	a.luts = luts
 	a.wg = &sync.WaitGroup{}
 	a.stride = len(a.data) / procs // pixels per proc
+	a.tile = tile
 
 	jobID := 0
 	for start := 0; start < len(a.data); start += a.stride {
@@ -131,7 +133,7 @@ func (a *Algo) computePatch(jobID, start int, min, max complex128) {
 
 	// ts := time.Now()
 
-	// fmt.Println("\t", jobID, min, max, "starting")
+	fmt.Println("\t", jobID, min, max, "starting tile:", a.tile, " start:", start, " stride:", a.stride, " start+stride:", start+a.stride, " len(data):", len(a.data))
 	span := max - min
 
 	for index := start; index < start+a.stride; index++ {
@@ -174,6 +176,15 @@ func (a *Algo) computePatch(jobID, start int, min, max complex128) {
 					its = iterate(s, 1e-15)
 				}
 			}
+		}
+
+		if index >= len(a.data) {
+			log.Println("!!")
+			log.Println("!!")
+			log.Println("!!\t", jobID, min, max, "tile:", a.tile, " start:", start, " stride:", a.stride, " start+stride:", start+a.stride, " len(data):", len(a.data), " index:", index)
+			log.Println("!!")
+			log.Println("!!")
+			panic(fmt.Sprintln("!!\tindex out of bounds: ", jobID, min, max, " index:", index, " start:", start, " stride:", a.stride, " start+stride:", start+a.stride, " len(data):", len(a.data)))
 		}
 		a.data[index] = its
 	}

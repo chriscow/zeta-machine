@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"os"
+	"sync"
 
 	"github.com/nsqio/go-nsq"
 )
@@ -15,6 +16,16 @@ const (
 	genChan      = "generate"
 	touchSec     = 30 // touch the message every so often
 )
+
+var (
+	queue map[string]bool
+	qm    *sync.Mutex
+)
+
+func init() {
+	queue = make(map[string]bool)
+	qm = &sync.Mutex{}
+}
 
 // Server interface provides a Shutdown method
 type Server interface {

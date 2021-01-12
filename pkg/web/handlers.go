@@ -9,6 +9,7 @@ import (
 	"image"
 	"image/color"
 	"image/png"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -17,6 +18,7 @@ import (
 	"strconv"
 	"strings"
 	"zetamachine/pkg/palette"
+	"zetamachine/pkg/utils"
 	"zetamachine/pkg/zeta"
 
 	"github.com/foolin/goview"
@@ -35,13 +37,7 @@ func isBlank(tile *zeta.Tile, w http.ResponseWriter) bool {
 
 		img := tile.RenderSolid(bkg)
 
-		buf := bytes.Buffer{}
-		if err := png.Encode(&buf, img); err != nil {
-			log.Println("Failed to encode background tile: ", err)
-			return false
-		}
-
-		writePNG(w, buf.Bytes())
+		writePNG(w, img)
 		return true
 	}
 
@@ -136,17 +132,52 @@ func (s *Server) serveTile() http.HandlerFunc {
 				http.Error(w, err.Error(), 500)
 				return
 			}
+
+			saveTmpPNG(tile, img)
 		}
 
-		// Encode the image to PNG format
-		buffer := new(bytes.Buffer)
-		if err := png.Encode(buffer, img); err != nil {
-			http.Error(w, "Unable to encode image: "+err.Error(), 500)
-			return
-		}
-
-		writePNG(w, buffer.Bytes())
+		writePNG(w, img)
 	})
+}
+
+func saveTmpPNG(tile *zeta.Tile, img image.Image) {
+	buf := &bytes.Buffer{}
+	err := png.Encode(buf, img)
+	if err != nil {
+		log.Println("[saveTmpPNG] failed to encode: ", err)
+		return
+	}
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		log.Println("[saveTmpPNG] failed to get wd: ", err)
+		return
+	}
+
+	fname := strings.Replace(tile.Filename(), ".dat", ".tmp.png", -1)
+	fpath := path.Join(cwd, tile.Path(), fname)
+	exists, err := utils.PathExists(fpath)
+	if err != nil {
+		log.Println("[saveTmpPNG] failed to check path: ", fpath, err)
+		return
+	}
+
+	if exists {
+		return
+	}
+
+	f, err := os.Create(fpath)
+	if err != nil {
+		log.Println("[saveTmpPNG] failed to open: ", fpath, err)
+		return
+	}
+
+	defer f.Close()
+	i, err := io.Copy(f, buf)
+	if err != nil {
+		log.Println("[saveTmpPNG] failed to copy: ", err, i)
+		return
+	}
 }
 
 func (s *Server) getTileData(tile *zeta.Tile, redo bool) (data []byte, err error) {
@@ -168,6 +199,7 @@ func (s *Server) getTileData(tile *zeta.Tile, redo bool) (data []byte, err error
 			log.Println("Failed to read data file: ", err)
 			return nil, err
 		}
+
 	} else {
 
 		// Tile data file does not exist.
@@ -239,9 +271,18 @@ func (s *Server) generateTile() http.HandlerFunc {
 }
 
 // writeImage encodes an image 'img' in jpeg format and writes it into ResponseWriter.
-func writePNG(w http.ResponseWriter, b []byte) {
+func writePNG(w http.ResponseWriter, img image.Image) {
+	buffer := new(bytes.Buffer)
+	if err := png.Encode(buffer, img); err != nil {
+		http.Error(w, "Unable to encode image: "+err.Error(), 500)
+		return
+	}
+
+	b := buffer.Bytes()
+
 	w.Header().Set("Content-Type", "image/png")
 	w.Header().Set("Content-Length", strconv.Itoa(len(b)))
+
 	if _, err := w.Write(b); err != nil {
 		http.Error(w, "Unable to write image to response: "+err.Error(), 500)
 		return

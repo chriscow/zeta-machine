@@ -69,6 +69,9 @@ func (s *Store) HandleMessage(m *nsq.Message) error {
 }
 
 func markReceived(tile *zeta.Tile) {
+	qm.Lock()
+	defer qm.Unlock()
+
 	if _, ok := queue[tile.Filename()]; ok {
 		log.Println("[requester] queued tile complete: ", tile)
 		delete(queue, tile.Filename())

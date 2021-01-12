@@ -29,7 +29,12 @@ func NewGenerator(v *valve.Valve) (*Generator, error) {
 	}
 
 	g := &Generator{valve: v, producer: p}
-	maxInFlight := runtime.GOMAXPROCS(0) // handle this many messages in parallel
+
+	maxInFlight := 1 // handle this many messages in parallel
+	if runtime.GOMAXPROCS(0) > 16 {
+		maxInFlight = runtime.GOMAXPROCS(0)
+	}
+
 	go StartConsumer(v.Context(), requestTopic, genChan, maxInFlight, g)
 
 	return g, nil
@@ -54,20 +59,36 @@ func (g *Generator) HandleMessage(m *nsq.Message) error {
 	}
 	defer g.valve.Close()
 
+	var res []byte
+
 	start := time.Now()
 
-	res, err := zeta.ComputeRequest(m.Body, nil)
-	if err != nil {
-		return err
+	done := make(chan bool)
+	ticker := time.NewTicker(time.Second * touchSec)
+
+	go func() {
+		defer func() { done <- true }()
+		var err error
+		res, err = zeta.ComputeRequest(m.Body, nil)
+		if err != nil {
+			log.Println("[generate] ComputeRequest failed: ", err)
+			return
+		}
+	}()
+
+	for {
+		select {
+		case <-done:
+			if err := g.producer.Publish(storeTopic, res); err != nil {
+				log.Println("[generator] failed to publish results: ", err)
+				return err
+			}
+
+			log.Println("[generator] completed in", time.Since(start))
+			return nil
+
+		case <-ticker.C:
+			m.Touch()
+		}
 	}
-
-	if err := g.producer.Publish(storeTopic, res); err != nil {
-		log.Println("[generator] failed to publish results: ", err)
-		return err
-	}
-
-	log.Println("[generator] completed in", time.Since(start))
-
-	// Returning a non-nil error will automatically send a REQ command to NSQ to re-queue the message.
-	return nil
 }

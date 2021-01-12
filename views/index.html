@@ -108,7 +108,7 @@
 
         L.tileLayer('http://{s}.{{.host}}/tile/{z}/{y}/{x}/', {
             minZoom: 0,
-            maxZoom: 40,
+            maxZoom: 8,
             errorTileUrl: 'http://{{.host}}/tile/-1/0/0/',
             tileSize: tileSize,
             subdomains: '{{.subdomains}}',
@@ -132,15 +132,8 @@
         // })
 
         zetaMap.on('zoom', e => {
-            if (!popping) {
-                $id("zoom").value = zetaMap.getZoom()
-                history.pushState(
-                    { zoom: zetaMap.getZoom(), pos: pos },
-                    "Zeta Machine - Zoom:" + zoom + " Pos:" + pos[1] + "," + pos[0],
-                    "?zoom=" + zoom + "&real=" + pos[1] + "&imag=" + pos[0]
-                )
-                console.log("[zoom] state pushed", zoom, pos)
-            }
+            $id("zoom").value = zetaMap.getZoom()
+            zoom = zetaMap.getZoom()
         })
 
         zetaMap.on('move', e => {
