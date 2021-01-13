@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"math"
 	"os"
@@ -25,9 +26,11 @@ var (
 func main() {
 	checkEnv()
 
-	zoom := flag.Int("zoom", 4, "zoom level (0-18 typically)")
-	limitY := flag.Int("y", 0, "tile limit in the imag dir. 2^zoom gets up a ways")
-	limitX := flag.Int("x", 0, "tile limit in the real dir. Same as zoom get critical area")
+	minZoom := flag.Int("min-zoom", 0, "minimum zoom to start checking for missing tiles")
+	zoom := flag.Int("zoom", 4, "maximum zoom level to generate tiles")
+	limitY := flag.Int("y", 0, "tile limit in the imag dir. Defaults to +/- 2^zoom")
+	limitX := flag.Int("x", 0, "tile limit in the real dir. Defaults to +/- zoom")
+	maxAge := flag.Duration("max-age", time.Hour*24*30, "re-request tiles that have not completed if older")
 	role := flag.String("role", "", "store, request, generate")
 	flag.Parse()
 
@@ -37,17 +40,17 @@ func main() {
 	var handler msg.Server
 	var err error
 
-	switch *role {
-	case "store":
+	switch (*role)[:3] {
+	case "sto":
 		handler, err = msg.NewStore(v)
-	case "request":
+	case "req":
 		handler, err = msg.NewRequester()
 		if err != nil {
 			log.Fatal(err)
 		}
-		bulkRequest(*zoom, *limitY, *limitX, handler)
+		bulkRequest(*minZoom, *zoom, *limitY, *limitX, *maxAge, handler)
 		wait = false
-	case "generate":
+	case "gen":
 		handler, err = msg.NewGenerator(v)
 	default:
 		log.Fatal("Unknown role: ", role)
@@ -71,7 +74,7 @@ func checkEnv() {
 	godotenv.Load()
 }
 
-func bulkRequest(zoom, limitY, limitX int, s msg.Server) {
+func bulkRequest(minZoom, zoom, limitY, limitX int, maxAge time.Duration, s msg.Server) {
 	log.Println("requesting tiles for zoom: ", zoom)
 
 	r := s.(*msg.Requester)
@@ -82,7 +85,10 @@ func bulkRequest(zoom, limitY, limitX int, s msg.Server) {
 	}
 
 	// tileCount := int(math.Pow(2, float64(zoom+1)))
-	for z := 0; z <= zoom; z++ {
+	for z := minZoom; z <= zoom; z++ {
+
+		requested := 0
+		skipped := 0
 
 		if limitY < int(math.Pow(2, float64(z))) {
 			limitY = int(math.Pow(2, float64(z)))
@@ -95,17 +101,20 @@ func bulkRequest(zoom, limitY, limitX int, s msg.Server) {
 		for y := -limitY; y < limitY; y++ {
 			for x := -limitX; x < limitX; x++ {
 				tile := &zeta.Tile{Zoom: z, X: x, Y: y}
-				sent, err := r.Send(tile)
+				sent, err := r.Send(tile, maxAge)
 				if err != nil {
 					log.Fatal(err)
 				}
 
 				if !sent {
+					skipped++
 					continue
 				}
-
-				log.Println("published request for: ", tile)
+				requested++
 			}
 		}
+
+		fmt.Println()
+		log.Println("zoom", z, "complete. sent:", requested, "skipped:", skipped)
 	}
 }

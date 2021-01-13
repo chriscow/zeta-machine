@@ -7,6 +7,7 @@ import (
 	"log"
 	"math"
 	"math/cmplx"
+	"runtime"
 	"sync"
 	"time"
 )
@@ -110,7 +111,7 @@ func (a *Algo) Compute(ctx context.Context, min, max complex128, luts []*LUT) []
 	a.luts = luts
 	a.wg = &sync.WaitGroup{}
 
-	stride := TileWidth * TileWidth / 8 // 8 jobs per tile
+	stride := len(a.data) / runtime.GOMAXPROCS(0) //TileWidth * TileWidth / 8 // 8 jobs per tile
 	ts := time.Now()
 
 	jobID := 0
@@ -147,7 +148,7 @@ func (a *Algo) computePatch(ctx context.Context, jobID, start, stride int, min, 
 
 		select {
 		case <-ctx.Done():
-			log.Println("[algo] job", jobID, "aborting")
+			log.Println("[algo] job", jobID, "canceled")
 			return
 		default:
 		}

@@ -3,7 +3,6 @@ package msg
 import (
 	"encoding/json"
 	"log"
-	"runtime"
 	"time"
 	"zetamachine/pkg/zeta"
 
@@ -33,7 +32,7 @@ func NewGenerator(v *valve.Valve) (*Generator, error) {
 
 	// 8 procs per tile.
 	// in flight is how many tiles this box will handle
-	maxInFlight := runtime.GOMAXPROCS(0) / 8
+	maxInFlight := 1 //runtime.GOMAXPROCS(0) / 8
 
 	log.Println("[generate] setting maxInFlight: ", maxInFlight)
 	go StartConsumer(v.Context(), RequestTopic, GenChan, maxInFlight, g)

@@ -20,7 +20,6 @@ import (
 	"strings"
 	"time"
 	"zetamachine/pkg/palette"
-	"zetamachine/pkg/utils"
 	"zetamachine/pkg/zeta"
 
 	"github.com/foolin/goview"
@@ -158,13 +157,8 @@ func saveTmpPNG(tile *zeta.Tile, img image.Image) {
 
 	fname := strings.Replace(tile.Filename(), ".dat", ".tmp.png", -1)
 	fpath := path.Join(cwd, tile.Path(), fname)
-	exists, err := utils.PathExists(fpath)
-	if err != nil {
-		log.Println("[saveTmpPNG] failed to check path: ", fpath, err)
-		return
-	}
-
-	if exists {
+	info, _ := os.Stat(fpath)
+	if info == nil {
 		return
 	}
 
@@ -173,8 +167,8 @@ func saveTmpPNG(tile *zeta.Tile, img image.Image) {
 		log.Println("[saveTmpPNG] failed to open: ", fpath, err)
 		return
 	}
-
 	defer f.Close()
+
 	i, err := io.Copy(f, buf)
 	if err != nil {
 		log.Println("[saveTmpPNG] failed to copy: ", err, i)
@@ -204,6 +198,9 @@ func (s *Server) getTileData(tile *zeta.Tile, redo bool) (data []byte, err error
 
 	} else {
 
+		// The plan is to only generate tiles for authorized users
+		// TODO: Do an auth check and queue up tile rendering. Return a temp tile
+
 		// Tile data file does not exist.
 
 		// hires, _ := tile.Downsample()
@@ -213,34 +210,34 @@ func (s *Server) getTileData(tile *zeta.Tile, redo bool) (data []byte, err error
 		// 	lowres, _ := tile.Upsample()
 		// }
 
-		if os.Getenv("ZETA_GENERATE_VIA") == "nsq" {
-			_, err := s.requester.Send(tile)
-			if err != nil {
-				log.Println("[server] Failed to send NSQ generate request: ", err)
-				return nil, err
-			}
+		// if os.Getenv("ZETA_GENERATE_VIA") == "nsq" {
+		// 	_, err := s.requester.Send(tile)
+		// 	if err != nil {
+		// 		log.Println("[server] Failed to send NSQ generate request: ", err)
+		// 		return nil, err
+		// 	}
 
-			return nil, ErrTileQueued
+		// 	return nil, ErrTileQueued
 
-		} else {
-			// reqGenHTTP alters the passed in tile with the resulting data
-			if err := reqGenHTTP(tile); err != nil {
-				log.Println("[server] Failed to send HTTP generate request: ", err)
-				return nil, err
-			}
-
-			// Save and decode the data
-			if err := tile.Save(); err != nil {
-				log.Println("Failed to save tile data: ", err)
-				return nil, err
-			}
-
-			data, err = base64.StdEncoding.DecodeString(tile.Data)
-			if err != nil {
-				log.Println("Failed to decode tile data: ", err)
-				return nil, err
-			}
+		// } else {
+		// reqGenHTTP alters the passed in tile with the resulting data
+		if err := reqGenHTTP(tile); err != nil {
+			log.Println("[server] Failed to send HTTP generate request: ", err)
+			return nil, err
 		}
+
+		// Save and decode the data
+		if err := tile.Save(); err != nil {
+			log.Println("Failed to save tile data: ", err)
+			return nil, err
+		}
+
+		data, err = base64.StdEncoding.DecodeString(tile.Data)
+		if err != nil {
+			log.Println("Failed to decode tile data: ", err)
+			return nil, err
+		}
+		// }
 	}
 
 	return data, nil
@@ -258,7 +255,7 @@ func (s *Server) generateTile() http.HandlerFunc {
 			http.Error(w, err.Error(), 500)
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 		if err != nil {
 			log.Println("Failed to create timeout context: ", err)
 			http.Error(w, err.Error(), 500)

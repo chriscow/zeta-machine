@@ -151,31 +151,36 @@ func (t *Tile) Path() string {
 }
 
 // Exists checks if the tile is already on the local disk
-func (t *Tile) Exists() (bool, error) {
-	var exists bool
+func (t *Tile) Exists() (os.FileInfo, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
-		return exists, err
+		return nil, err
 	}
 	// see if we already have this tile
 	fname := path.Join(cwd, t.Path(), t.Filename())
-	return utils.PathExists(fname)
+	return os.Stat(fname)
 }
 
 // ShouldGenerate checks for the existence of the tile and also for the temp file
-// created when a tile is requested.  If either exists, Requested returns true
-// to avoid re-requesting generation of pre-existing tiles or ones already in
-// the generation queue
-func (t *Tile) ShouldGenerate() (bool, error) {
+// created when a tile is requested.
+// If the tile data already exists, ShouldGenerate returns true and makes sure
+// there is no temporary .req file still hanging around.
+//
+// If the tile data doesn't exist, we check for a temporary .req file in its place
+// to see if it has recently been requested to avoid re-requesting generation.
+//
+// If we find a .req file AND it is less than `maxAgeMin` minuites old we return false. It is
+// already in the queue to be generated. If it is older than 24 hours, we delete
+// the temporary .req file and re-request generation.
+//
+func (t *Tile) ShouldGenerate(maxAge time.Duration) (bool, error) {
 	// the tile tile already exists, return not ok
-	exists, err := t.Exists()
-	if err != nil {
+	existing, err := t.Exists()
+	if existing != nil {
+		// Since the tile data already exists, make sure there isn't a
+		// left over .req temp file hanging around
+		t.Received()
 		return false, err
-	}
-
-	// Tile already exists
-	if exists {
-		return false, nil
 	}
 
 	cwd, err := os.Getwd()
@@ -183,34 +188,38 @@ func (t *Tile) ShouldGenerate() (bool, error) {
 		return false, err
 	}
 
-	if err := utils.CreateFolder(t.Path()); err != nil {
+	// folder should exist no matter what
+	fpath := path.Join(cwd, t.Path())
+	if err := utils.CreateFolder(fpath); err != nil {
 		log.Println("[ShouldGenerate] failed to create: ", t.Path())
 		log.Println("[ShouldGenerate] failed: ", err)
 		return false, err
 	}
 
 	// see if we already have this tile flagged with a temp file
-	fname := t.Filename() + ".req"
-	fpath := path.Join(cwd, t.Path(), fname)
-	info, err := os.Stat(fpath)
+	fname := path.Join(fpath, t.Filename()+".req")
+	info, err := os.Stat(fname)
 	if err != nil {
-		if os.IsExist(err) {
-			age := time.Since(info.ModTime())
-			if age.Hours() > 2.0 {
-				// file is old. remove it
-				os.Remove(fpath)
-			}
-			return false, nil
-		}
-
-		if !os.IsNotExist(err) {
-			return false, err
-		}
-	} else {
-		// request file already exists
-		return false, nil
+		return false, err
 	}
 
+	if info != nil {
+		// check its age
+		age := time.Since(info.ModTime())
+		if age > maxAge {
+			// file is old. remove it
+			os.Remove(fpath)
+		} else {
+			// file exists and it has not timed out
+			return false, nil
+		}
+	}
+
+	// the .req file either didn't exist or is older than 24 hours and was deleted above
+	// tell the client to go ahead and re-request it
+	//
+	// we'll create a temporary `.req` file as a flag to indicate we have
+	// already requested the file and it is pending, in case someone comes asking again.
 	f, err := os.Create(fpath)
 	if err != nil {
 		log.Println("[ShouldGenerate] failed to create: ", fpath)

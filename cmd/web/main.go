@@ -1,11 +1,14 @@
 package main
 
 import (
+	"log"
 	web "zetamachine/pkg/web"
 )
 
 func main() {
-	run()
+	if err := run(); err != nil {
+		log.Fatal(err)
+	}
 }
 
 func run() error {

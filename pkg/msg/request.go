@@ -3,6 +3,7 @@ package msg
 import (
 	"encoding/json"
 	"log"
+	"time"
 	"zetamachine/pkg/zeta"
 
 	"github.com/nsqio/go-nsq"
@@ -31,15 +32,16 @@ func (r *Requester) Shutdown() {
 }
 
 // Send ...
-func (r *Requester) Send(tile *zeta.Tile) (bool, error) {
-	ok, err := tile.ShouldGenerate()
+func (r *Requester) Send(tile *zeta.Tile, maxAge time.Duration) (bool, error) {
+
+	ok, err := tile.ShouldGenerate(maxAge)
 	if err != nil {
 		log.Println("[requeter] could not determine if we should generate: ", tile, err)
 		return ok, err
 	}
 
 	if !ok {
-		log.Println("[requester] already requested tile: ", tile, "skipping.")
+		// log.Println("[requester] already requested tile: ", tile, "skipping.")
 		return ok, nil
 	}
 
@@ -57,6 +59,5 @@ func (r *Requester) Send(tile *zeta.Tile) (bool, error) {
 		return false, err
 	}
 
-	log.Println("[requester] tile requested: ", tile)
 	return true, nil
 }
