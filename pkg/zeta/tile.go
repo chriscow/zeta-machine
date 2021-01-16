@@ -18,7 +18,6 @@ import (
 	"path"
 	"strconv"
 	"time"
-	"zetamachine/pkg/utils"
 
 	"github.com/go-chi/chi"
 )
@@ -147,17 +146,14 @@ func (t *Tile) Filename() string {
 
 // Path returns the full relative path to the file
 func (t *Tile) Path() string {
-	return fmt.Sprintf("public/tiles/%d/%d", t.Zoom, t.Y)
+	tilePath := os.Getenv("ZETA_TILE_PATH")
+	return path.Join(tilePath, fmt.Sprintf("%d/%d", t.Zoom, t.Y))
 }
 
 // Exists checks if the tile is already on the local disk
 func (t *Tile) Exists() (os.FileInfo, error) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return nil, err
-	}
 	// see if we already have this tile
-	fname := path.Join(cwd, t.Path(), t.Filename())
+	fname := path.Join(t.Path(), t.Filename())
 	return os.Stat(fname)
 }
 
@@ -183,14 +179,9 @@ func (t *Tile) ShouldGenerate(maxAge time.Duration) (bool, error) {
 		return false, err
 	}
 
-	cwd, err := os.Getwd()
-	if err != nil {
-		return false, err
-	}
-
 	// folder should exist no matter what
-	fpath := path.Join(cwd, t.Path())
-	if err := utils.CreateFolder(fpath); err != nil {
+	fpath := t.Path()
+	if err := os.MkdirAll(fpath, os.ModeDir|os.ModePerm); err != nil {
 		log.Println("[ShouldGenerate] failed to create: ", t.Path())
 		log.Println("[ShouldGenerate] failed: ", err)
 		return false, err
@@ -234,14 +225,8 @@ func (t *Tile) ShouldGenerate(maxAge time.Duration) (bool, error) {
 // Received is called to remove the temp file that was created when this tile
 // was requested to be generated
 func (t *Tile) Received() {
-	cwd, err := os.Getwd()
-	if err != nil {
-		log.Println("[tile::Received] could not remove tmp file: ", err)
-		return
-	}
-
 	fname := t.Filename() + ".req"
-	fpath := path.Join(cwd, t.Path(), fname)
+	fpath := path.Join(t.Path(), fname)
 	if err := os.Remove(fpath); err != nil {
 		log.Println("[tile::Received] could not remove tmp file: ", err)
 		return
@@ -289,9 +274,7 @@ func (t *Tile) String() string {
 
 // Save saves the binary iteration data from a tile
 func (t *Tile) Save() error {
-	cwd, _ := os.Getwd()
-
-	fpath := path.Join(cwd, t.Path())
+	fpath := t.Path()
 	fname := path.Join(fpath, t.Filename())
 
 	data, err := base64.StdEncoding.DecodeString(t.Data)
@@ -300,7 +283,7 @@ func (t *Tile) Save() error {
 	}
 
 	// does not return an error if the path exists. creates the path recusively
-	if err := utils.CreateFolder(fpath); err != nil {
+	if err := os.MkdirAll(fpath, os.ModeDir|os.ModePerm); err != nil {
 		return err
 	}
 

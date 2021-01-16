@@ -78,11 +78,6 @@ func bulkRequest(minZoom, zoom, limitY, limitX int, maxAge time.Duration, s msg.
 	log.Println("requesting tiles for zoom: ", zoom)
 
 	r := s.(*msg.Requester)
-	cwd, err := os.Getwd()
-	if err != nil {
-		log.Fatal("can't get working dir: ", cwd)
-		return
-	}
 
 	// tileCount := int(math.Pow(2, float64(zoom+1)))
 	for z := minZoom; z <= zoom; z++ {

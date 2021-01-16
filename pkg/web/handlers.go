@@ -149,14 +149,8 @@ func saveTmpPNG(tile *zeta.Tile, img image.Image) {
 		return
 	}
 
-	cwd, err := os.Getwd()
-	if err != nil {
-		log.Println("[saveTmpPNG] failed to get wd: ", err)
-		return
-	}
-
 	fname := strings.Replace(tile.Filename(), ".dat", ".tmp.png", -1)
-	fpath := path.Join(cwd, tile.Path(), fname)
+	fpath := path.Join(tile.Path(), fname)
 	info, _ := os.Stat(fpath)
 	if info == nil {
 		return
@@ -177,9 +171,7 @@ func saveTmpPNG(tile *zeta.Tile, img image.Image) {
 }
 
 func (s *Server) getTileData(tile *zeta.Tile, redo bool) (data []byte, err error) {
-	cwd, _ := os.Getwd()
-
-	fpath := path.Join(cwd, tile.Path())
+	fpath := tile.Path()
 	fname := path.Join(fpath, tile.Filename())
 
 	if _, err := os.Stat(fname); err == nil && !redo {
