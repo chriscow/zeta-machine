@@ -40,6 +40,7 @@ type Tile struct {
 	Zoom      int    `json:"zoom"`
 	X         int    `json:"x"`
 	Y         int    `json:"y"`
+	Size      int    `json:"size"`
 	Data      string `json:"data"`
 	upsampled bool
 }
@@ -104,6 +105,35 @@ func ComputeRequest(ctx context.Context, b []byte, luts []*LUT) ([]byte, error) 
 // PPU returns the resolution of this tile in pixels per unit
 func (t *Tile) PPU() int {
 	return int(float64(TileWidth) / (real(t.Max() - t.Min())))
+}
+
+// Min returns the lower left coordinate in 'units' this tile renders
+func (t *Tile) Min() complex128 {
+	// Tile count is always even. Tile 0,0 is in the center so tile
+	// numbers can be negative
+	offset := float64(t.tileCount()) / 2
+	x := float64(t.X) + offset
+	y := float64(t.Y) + offset
+	stride := t.Units()
+
+	r := real(GlobalMin) + x*stride
+	i := imag(GlobalMin) + y*stride
+	return complex(r, i)
+}
+
+// Max returns the upper-right coordinate in 'units' this tile renders
+func (t *Tile) Max() complex128 {
+	min := t.Min()
+	stride := t.Units()
+
+	r := real(min) + stride
+	i := imag(min) + stride
+	return complex(r, i)
+}
+
+// Units is the number of 'units' this tile covers (this is not pixels)
+func (t *Tile) Units() float64 {
+	return TotalUnits / t.tileCount()
 }
 
 // IsBackground tries to determine if the tile would be rendered the background
@@ -237,35 +267,6 @@ func (t *Tile) Received() {
 // at the set zoom level
 func (t *Tile) tileCount() float64 {
 	return math.Pow(2, float64(t.Zoom+1))
-}
-
-// Min returns the lower left coordinate in 'units' this tile renders
-func (t *Tile) Min() complex128 {
-	// Tile count is always even. Tile 0,0 is in the center so tile
-	// numbers can be negative
-	offset := float64(t.tileCount()) / 2
-	x := float64(t.X) + offset
-	y := float64(t.Y) + offset
-	stride := t.Units()
-
-	r := real(GlobalMin) + x*stride
-	i := imag(GlobalMin) + y*stride
-	return complex(r, i)
-}
-
-// Max returns the upper-right coordinate in 'units' this tile renders
-func (t *Tile) Max() complex128 {
-	min := t.Min()
-	stride := t.Units()
-
-	r := real(min) + stride
-	i := imag(min) + stride
-	return complex(r, i)
-}
-
-// Units is the number of 'units' this tile covers (this is not pixels)
-func (t *Tile) Units() float64 {
-	return TotalUnits / t.tileCount()
 }
 
 func (t *Tile) String() string {
