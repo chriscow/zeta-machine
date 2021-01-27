@@ -27,7 +27,7 @@ func main() {
 	checkEnv()
 
 	minZoom := flag.Int("min-zoom", 0, "minimum zoom to start checking for missing tiles")
-	zoom := flag.Int("zoom", 10, "maximum zoom level to generate tiles")
+	zoom := flag.Int("zoom", 4, "maximum zoom level to generate tiles")
 
 	maxAge := flag.Duration("max-age", time.Hour*24*30, "re-request tiles that have not completed if older")
 	role := flag.String("role", "", "store, request, generate")
