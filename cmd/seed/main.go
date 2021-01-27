@@ -27,11 +27,15 @@ func main() {
 	checkEnv()
 
 	minZoom := flag.Int("min-zoom", 0, "minimum zoom to start checking for missing tiles")
-	zoom := flag.Int("zoom", 4, "maximum zoom level to generate tiles")
+	zoom := flag.Int("zoom", 10, "maximum zoom level to generate tiles")
 
 	maxAge := flag.Duration("max-age", time.Hour*24*30, "re-request tiles that have not completed if older")
 	role := flag.String("role", "", "store, request, generate")
 	flag.Parse()
+
+	if *role == "" {
+		log.Fatal("Role not specified")
+	}
 
 	v := valve.New()
 	wait := true
@@ -89,8 +93,9 @@ func bulkRequest(minZoom, zoom, limit int, maxAge time.Duration, s msg.Server) {
 
 		for rl := -512.0; rl < 512; rl += units {
 			for im := -4096.0; im < 4096; im += units {
+
 				patch := zeta.NewPatch(complex(rl, im), complex(rl+units, im+units))
-				sent, err := r.Send(&patch)
+				sent, err := r.Send(patch)
 				if err != nil {
 					log.Fatal(err)
 				}

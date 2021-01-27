@@ -14,21 +14,21 @@ type Patch struct {
 	Data []uint32  `json:"data"`
 }
 
-func NewPatch(min, max complex128) Patch {
-	p := Patch{Size: PatchSize}
+func NewPatch(min, max complex128) *Patch {
+	p := &Patch{Size: PatchSize}
 	p.SetMin(min)
 	p.SetMax(max)
 
 	return p
 }
 
-func (p Patch) SetMin(min complex128) {
+func (p *Patch) SetMin(min complex128) {
 	p.Min = make([]float64, 2)
 	p.Min[0] = real(min)
 	p.Min[1] = imag(min)
 }
 
-func (p Patch) SetMax(max complex128) {
+func (p *Patch) SetMax(max complex128) {
 	p.Max = make([]float64, 2)
 	p.Max[0] = real(max)
 	p.Max[1] = imag(max)

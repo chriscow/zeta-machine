@@ -1,8 +1,14 @@
+// +build BUILD_CUDA
+
 package cuda
 
 // compile the cuda code from the root workspace folder with:
 //
 //	nvcc --ptxas-options=-v --compiler-options '-fPIC' -o ./cmd/cuda/libzm.so --shared ./cuda/zeta.cu ./cuda/main.cu
+//
+// compile the go code with:
+//
+//	go build -tags BUILD_CUDA -o build/cuda ./cmd/cuda/.
 //
 
 /*
@@ -10,6 +16,7 @@ void generate(double minR, double maxR, double minI, double maxI, unsigned int s
 #cgo LDFLAGS: -L. -L./ -lzm
 */
 import "C"
+
 import (
 	"zetamachine/pkg/zeta"
 )
