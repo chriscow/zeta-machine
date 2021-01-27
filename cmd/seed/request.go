@@ -1,9 +1,8 @@
-package msg
+package main
 
 import (
 	"encoding/json"
 	"log"
-	"time"
 	"zetamachine/pkg/zeta"
 
 	"github.com/nsqio/go-nsq"
@@ -32,18 +31,18 @@ func (r *Requester) Shutdown() {
 }
 
 // Send ...
-func (r *Requester) Send(tile *zeta.Tile, maxAge time.Duration) (bool, error) {
+func (r *Requester) Send(tile *zeta.Patch) (bool, error) {
 
-	ok, err := tile.ShouldGenerate(maxAge)
-	if err != nil {
-		log.Println("[requeter] could not determine if we should generate: ", tile, err)
-		return ok, err
-	}
+	// ok, err := tile.ShouldGenerate(maxAge)
+	// if err != nil {
+	// 	log.Println("[requeter] could not determine if we should generate: ", tile, err)
+	// 	return ok, err
+	// }
 
-	if !ok {
-		// log.Println("[requester] already requested tile: ", tile, "skipping.")
-		return ok, nil
-	}
+	// if !ok {
+	// 	// log.Println("[requester] already requested tile: ", tile, "skipping.")
+	// 	return ok, nil
+	// }
 
 	msg, err := json.Marshal(tile)
 	if err != nil {
@@ -53,7 +52,7 @@ func (r *Requester) Send(tile *zeta.Tile, maxAge time.Duration) (bool, error) {
 
 	// Synchronously publish a single message to the specified topic.
 	// Messages can also be sent asynchronously and/or in batches.
-	err = r.producer.Publish(RequestTopic, msg)
+	err = r.producer.Publish("patch-request", msg)
 	if err != nil {
 		log.Println("[requester] failed to publish message: ", err)
 		return false, err

@@ -21,6 +21,13 @@ import (
 )
 
 //
+// This is a simple server that takes a request to generate iteration data
+// from a message received over NSQ. The iteration data is then serialized and
+// published back over NSQ.
+//
+// The actual data generation is done via a CUDA program and linked to this one.
+// (see the pkg/cuda/cuda.go file)
+//
 // curl -d '{"size": 1024, "min": [-30.0, -30.0], "max": [30, 30]}' 'http://127.0.0.1:4151/pub?topic=patch-request'
 //
 

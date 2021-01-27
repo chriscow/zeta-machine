@@ -24,7 +24,6 @@ type Server struct {
 	port       string
 	subdomains []string
 	luts       []*zeta.LUT
-	requester  *msg.Requester
 	store      *msg.Store
 	valve      *valve.Valve
 }
@@ -55,7 +54,6 @@ func (s *Server) Run() error {
 
 	log.Println("Listening and serving on :" + s.port)
 	if http.ListenAndServe(":"+s.port, r) != nil {
-		s.requester.Shutdown()
 	}
 	return err
 }
@@ -69,13 +67,6 @@ func (s *Server) config() error {
 	s.port = os.Getenv("ZETA_PORT")
 	s.subdomains = strings.Split(os.Getenv("ZETA_SUBDOMAINS"), ",")
 	s.valve = valve.New()
-
-	r, err := msg.NewRequester()
-	if err != nil {
-		log.Println("[server] failed creating requester: ", err)
-		return err
-	}
-	s.requester = r
 
 	store, err := msg.NewStore(s.valve)
 	if err != nil {

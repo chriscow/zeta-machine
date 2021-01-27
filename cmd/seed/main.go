@@ -28,8 +28,7 @@ func main() {
 
 	minZoom := flag.Int("min-zoom", 0, "minimum zoom to start checking for missing tiles")
 	zoom := flag.Int("zoom", 4, "maximum zoom level to generate tiles")
-	limitY := flag.Int("y", 0, "tile limit in the imag dir. Defaults to +/- 2^zoom")
-	limitX := flag.Int("x", 0, "tile limit in the real dir. Defaults to +/- zoom")
+
 	maxAge := flag.Duration("max-age", time.Hour*24*30, "re-request tiles that have not completed if older")
 	role := flag.String("role", "", "store, request, generate")
 	flag.Parse()
@@ -44,11 +43,11 @@ func main() {
 	case "sto":
 		handler, err = msg.NewStore(v)
 	case "req":
-		handler, err = msg.NewRequester()
+		handler, err = NewRequester()
 		if err != nil {
 			log.Fatal(err)
 		}
-		bulkRequest(*minZoom, *zoom, *limitY, *limitX, *maxAge, handler)
+		bulkRequest(*minZoom, *zoom, 0, *maxAge, handler)
 		wait = false
 	case "gen":
 		handler, err = msg.NewGenerator(v)
@@ -74,10 +73,10 @@ func checkEnv() {
 	godotenv.Load()
 }
 
-func bulkRequest(minZoom, zoom, limitY, limitX int, maxAge time.Duration, s msg.Server) {
+func bulkRequest(minZoom, zoom, limit int, maxAge time.Duration, s msg.Server) {
 	log.Println("requesting tiles for zoom: ", zoom)
 
-	r := s.(*msg.Requester)
+	r := s.(*Requester)
 
 	// tileCount := int(math.Pow(2, float64(zoom+1)))
 	for z := minZoom; z <= zoom; z++ {
@@ -85,18 +84,13 @@ func bulkRequest(minZoom, zoom, limitY, limitX int, maxAge time.Duration, s msg.
 		requested := 0
 		skipped := 0
 
-		if limitY < int(math.Pow(2, float64(z))) {
-			limitY = int(math.Pow(2, float64(z)))
-		}
+		ppu := math.Pow(2, float64(z))
+		units := 1024 / ppu
 
-		if limitX < z*2 {
-			limitX = z * 2
-		}
-
-		for y := -limitY; y < limitY; y++ {
-			for x := -limitX; x < limitX; x++ {
-				tile := &zeta.Tile{Zoom: z, X: x, Y: y}
-				sent, err := r.Send(tile, maxAge)
+		for rl := -512.0; rl < 512; rl += units {
+			for im := -4096.0; im < 4096; im += units {
+				patch := zeta.NewPatch(complex(rl, im), complex(rl+units, im+units))
+				sent, err := r.Send(&patch)
 				if err != nil {
 					log.Fatal(err)
 				}

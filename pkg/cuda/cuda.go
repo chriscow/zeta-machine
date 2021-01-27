@@ -2,7 +2,7 @@ package cuda
 
 // compile the cuda code from the root workspace folder with:
 //
-//	nvcc --ptxas-options=-v --compiler-options '-fPIC' -o ./cmd/mkpatch/libzm.so --shared ./cuda/zeta.cu ./cuda/main.cu
+//	nvcc --ptxas-options=-v --compiler-options '-fPIC' -o ./cmd/cuda/libzm.so --shared ./cuda/zeta.cu ./cuda/main.cu
 //
 
 /*
