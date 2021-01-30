@@ -40,13 +40,6 @@ func main() {
 	v := valve.New()
 
 	switch *role {
-	case "sto":
-		fallthrough
-	case "store":
-		server, err = seed.NewStore(v)
-		if err != nil {
-			log.Fatal(err)
-		}
 	case "req":
 		fallthrough
 	case "request":

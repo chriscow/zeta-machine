@@ -24,6 +24,7 @@ type Server struct {
 	subdomains []string
 	luts       []*zeta.LUT
 	valve      *valve.Valve
+	store 	   *Store
 }
 
 // Run reads the configuration from the environment etc., configures routes and
@@ -50,6 +51,8 @@ func (s *Server) Run() error {
 		return err
 	}
 
+	s.store.Start()
+
 	log.Println("Listening and serving on :" + s.port)
 	if http.ListenAndServe(":"+s.port, r) != nil {
 	}
@@ -65,6 +68,13 @@ func (s *Server) config() error {
 	s.port = os.Getenv("ZETA_PORT")
 	s.subdomains = strings.Split(os.Getenv("ZETA_SUBDOMAINS"), ",")
 	s.valve = valve.New()
+	
+	store, err := NewStore(s.valve)
+	if err != nil {
+		return err
+	}
+
+	s.store = store
 
 	http.DefaultTransport.(*http.Transport).MaxIdleConnsPerHost = 8
 

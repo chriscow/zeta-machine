@@ -1,27 +1,32 @@
-package seed
+package utils
 
 import (
 	"context"
-	"log"
 	"os"
+	"errors"
 
 	"github.com/nsqio/go-nsq"
 )
 
 const (
-	touchSec = 30 // touch the message every so often
+	TouchSec = 30 // touch the message every so often
 )
 
-func checkEnv() {
+func checkEnv() error {
 	if os.Getenv("ZETA_NSQLOOKUP") == "" {
-		log.Fatal("ZETA_NSQLOOKUP environment not set")
+		return errors.New("ZETA_NSQLOOKUP environment not set")
 	}
+	return nil
 }
 
 // StartConsumer is a helper function that starts consuming a topic from NSQ. It
 // will block until the context.Done() channel closes / receives a value at which
 // point it gracefully shuts down the consumer.
 func StartConsumer(ctx context.Context, topic, channel string, maxInFlight int, handler nsq.Handler) error {
+	if err := checkEnv(); err != nil {
+		return err
+	}
+
 	// Instantiate a consumer that will subscribe to the provided channel.
 	config := nsq.NewConfig()
 	config.MaxInFlight = maxInFlight

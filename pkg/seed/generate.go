@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"time"
+	"zetamachine/pkg/utils"
 	"zetamachine/pkg/zeta"
 
 	"github.com/go-chi/valve"
@@ -62,7 +63,7 @@ func NewCudaServer(v *valve.Valve) (*CudaServer, error) {
 // Start starts the NSQ consumer to service request messages
 func (s *CudaServer) Start() {
 	go func() {
-		if err := StartConsumer(s.valve.Context(), requestPatchTopic, "patch-generator", 1, s); err != nil {
+		if err := utils.StartConsumer(s.valve.Context(), requestPatchTopic, "patch-generator", 1, s); err != nil {
 			log.Fatal(err)
 		}
 	}()
@@ -85,7 +86,7 @@ func (s *CudaServer) HandleMessage(msg *nsq.Message) error {
 	// GeneratePatch creates all the patch / tile data
 	// splits the patch into 4 tiles.
 	start := time.Now()
-	ticker := time.NewTicker(touchSec * time.Second)
+	ticker := time.NewTicker(utils.TouchSec * time.Second)
 	done := make(chan bool)
 	go func() {
 		patch.Generate(s.valve.Context())

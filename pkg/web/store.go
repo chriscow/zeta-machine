@@ -1,9 +1,10 @@
-package seed
+package web
 
 import (
 	"encoding/json"
 	"log"
 	"runtime"
+	"zetamachine/pkg/utils"
 	"zetamachine/pkg/zeta"
 
 	"github.com/go-chi/valve"
@@ -32,7 +33,7 @@ func NewStore(v *valve.Valve) (*Store, error) {
 func (s *Store) Start() {
 	log.Println("[store] starting consumer on ", storeTopic, " `store`")
 	maxInFlight := runtime.GOMAXPROCS(0)
-	go StartConsumer(s.valve.Context(), storeTopic, "store", maxInFlight, s)
+	go utils.StartConsumer(s.valve.Context(), storeTopic, "store", maxInFlight, s)
 }
 
 // HandleMessage handles completed tiles from the Generator and stores them
