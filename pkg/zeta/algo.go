@@ -7,7 +7,6 @@ import (
 	"log"
 	"math"
 	"math/cmplx"
-	"runtime"
 	"sync"
 	"time"
 )
@@ -108,7 +107,7 @@ func (a *Algo) Compute(ctx context.Context, min, max complex128, size int) []uin
 	a.data = make([]uint16, size)
 	a.wg = &sync.WaitGroup{}
 
-	stride := len(a.data) / runtime.GOMAXPROCS(0) //TileWidth * TileWidth / 8 // 8 jobs per tile
+	stride := len(a.data) // / runtime.GOMAXPROCS(0) //TileWidth * TileWidth / 8 // 8 jobs per tile
 	ts := time.Now()
 
 	jobID := 0

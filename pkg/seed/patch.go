@@ -2,6 +2,8 @@ package seed
 
 import (
 	"fmt"
+	"math"
+	"zetamachine/pkg/palette"
 	"zetamachine/pkg/zeta"
 )
 
@@ -14,22 +16,24 @@ const (
 // larger areas than just a single tile in one go, then split them up into
 // a suitable size for display on the web
 type Patch struct {
-	ID   uint64    `json:"id"`
-	Zoom uint8     `json:"zoom"`
-	X    int       `json:"x"`
-	Y    int       `json:"y"`
-	Min  []float64 `json:"min"`
-	Max  []float64 `json:"max"`
-	Data []uint16  `json:"data"`
+	ID    uint64    `json:"id"`
+	Zoom  uint8     `json:"zoom"`
+	X     int       `json:"x"`
+	Y     int       `json:"y"`
+	Width int       `json:"width"`
+	Min   []float64 `json:"min"`
+	Max   []float64 `json:"max"`
+	Data  []uint16  `json:"data"`
 }
 
 // NewPatch ...
-func NewPatch(id uint64, zoom uint8, min, max complex128, x, y int) *Patch {
+func NewPatch(id uint64, zoom uint8, min, max complex128, x, y, width int) *Patch {
 	p := &Patch{
-		ID:   id,
-		Zoom: zoom,
-		X:    x,
-		Y:    y,
+		ID:    id,
+		Zoom:  zoom,
+		X:     x,
+		Y:     y,
+		Width: width,
 	}
 	p.SetMin(min)
 	p.SetMax(max)
@@ -65,6 +69,22 @@ func (p *Patch) GetMax() complex128 {
 	return complex(p.Max[0], p.Max[1])
 }
 
+// SavePNG ...
+func (p *Patch) SavePNG() error {
+	ppu := math.Pow(2, float64(p.Zoom))
+	units := p.Max[0] - p.Min[0]
+
+	tile := zeta.Tile{
+		Zoom:  int(p.Zoom),
+		X:     p.X,
+		Y:     p.Y,
+		Width: int(units * ppu),
+		Data:  p.Data,
+	}
+
+	return tile.SavePNG(palette.DefaultPalette)
+}
+
 // Split splits the patch data into individual tiles
 func (p *Patch) Split() ([]*zeta.Tile, error) {
 
@@ -83,13 +103,13 @@ func (p *Patch) Split() ([]*zeta.Tile, error) {
 	//
 	for i := range tiles {
 		tiles[i] = &zeta.Tile{
-			Zoom: int(p.Zoom),
-			Data: make([]uint16, zeta.TileWidth*zeta.TileWidth),
+			Zoom:  int(p.Zoom),
+			Data:  make([]uint16, zeta.TileWidth*zeta.TileWidth),
 			Width: zeta.TileWidth,
 		}
 
 		for row := 0; row < zeta.TileWidth; row++ {
-			start := i*zeta.TileWidth + row*PatchWidth
+			start := i*zeta.TileWidth + row*p.Width
 
 			// copy one row of data from the patch to the tile
 			copy(tiles[i].Data[row*zeta.TileWidth:row*zeta.TileWidth+zeta.TileWidth],

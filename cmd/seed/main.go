@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"log"
@@ -9,6 +10,7 @@ import (
 	"syscall"
 	"time"
 	"zetamachine/pkg/seed"
+	"zetamachine/pkg/zeta"
 
 	"github.com/go-chi/valve"
 	"github.com/joho/godotenv"
@@ -26,9 +28,9 @@ func main() {
 	}
 
 	minZoom := uint8(*flag.Int("min-zoom", 0, "minimum zoom to start checking for missing tiles"))
-	maxZoom := uint8(*flag.Int("max-zoom", 4, "maximum zoom level to generate tiles"))
+	maxZoom := uint8(*flag.Int("max-zoom", 0, "maximum zoom level to generate tiles"))
 
-	role := flag.String("role", "", "store, request, generate")
+	role := flag.String("role", "", "make, request, generate")
 	flag.Parse()
 
 	if *role == "" {
@@ -40,6 +42,12 @@ func main() {
 	v := valve.New()
 
 	switch *role {
+	case "make":
+		p := seed.NewPatch(0, 0, complex(-30, -30), complex(30, 30), 0, 0, zeta.TileWidth)
+		p.Generate(context.Background())
+		p.SavePNG()
+		os.Exit(0)
+
 	case "req":
 		fallthrough
 	case "request":

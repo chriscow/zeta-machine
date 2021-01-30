@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"math"
+	"zetamachine/pkg/zeta"
 
 	"github.com/go-chi/valve"
 
@@ -49,6 +50,7 @@ func (r *Requester) Start() {
 		log.Println("[request] zoom:", r.minZoom, "-", r.maxZoom)
 
 		var count uint64
+		width := zeta.TileWidth
 
 		// tileCount := int(math.Pow(2, float64(zoom+1)))
 		for zoom := r.minZoom; zoom <= r.maxZoom; zoom++ {
@@ -57,7 +59,7 @@ func (r *Requester) Start() {
 			skipped := 0
 
 			ppu := math.Pow(2, float64(zoom))
-			units := float64(PatchWidth) / ppu // units per patch
+			units := float64(width) / ppu // units per patch
 
 			// handles the case for zoom == 0 because
 			// xRange is only 512 and that is less than a single patch
@@ -74,7 +76,7 @@ func (r *Requester) Start() {
 					rl := -xr + units*float64(x+xCount)
 					im := -yRange + units*float64(y+yCount)
 
-					patch := NewPatch(count, zoom, complex(rl, im), complex(rl+units, im+units), x, y)
+					patch := NewPatch(count, zoom, complex(rl, im), complex(rl+units, im+units), x, y, width)
 					count++
 
 					log.Println("[request] patch:", patch)

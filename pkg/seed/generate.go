@@ -106,6 +106,8 @@ loop:
 
 	genTime := time.Since(start)
 
+	patch.SavePNG()
+
 	tiles, err := patch.Split()
 	if err != nil {
 		log.Println("[cuda server] error splitting patch:", err)

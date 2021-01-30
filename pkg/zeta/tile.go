@@ -38,12 +38,11 @@ const (
 // Tile holds information for generating a single zeta tile at a particular
 // zoom level
 type Tile struct {
-	Zoom      int      `json:"zoom"`
-	X         int      `json:"x"`
-	Y         int      `json:"y"`
-	Width     int      `json:"width"`
-	Data      []uint16 `json:"data"`
-	upsampled bool
+	Zoom  int      `json:"zoom"`
+	X     int      `json:"x"`
+	Y     int      `json:"y"`
+	Width int      `json:"width"`
+	Data  []uint16 `json:"data"`
 }
 
 // Render generates a single tile image using the tile's properties
@@ -241,8 +240,14 @@ func (t *Tile) SavePNG(colors []color.Color) error {
 		return err
 	}
 
+	fpath := t.Path()
+	// does not return an error if the path exists. creates the path recusively
+	if err := os.MkdirAll(fpath, os.ModeDir|os.ModePerm); err != nil {
+		return err
+	}
+
 	fname := strings.Replace(t.Filename(), ".dat", ".png", -1)
-	fpath := path.Join(t.Path(), fname)
+	fpath = path.Join(fpath, fname)
 	info, _ := os.Stat(fpath)
 	if info != nil {
 		// exists
