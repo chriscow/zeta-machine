@@ -8,12 +8,10 @@ import (
 	"fmt"
 	"image"
 	"image/png"
-	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
-	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -124,41 +122,14 @@ func (s *Server) serveTile() http.HandlerFunc {
 		}
 
 		// for debugging, write out the png to a file
-		saveTmpPNG(tile, img)
+		tile.SavePNG(palette.DefaultPalette)
 
 		// send the png over the wire
 		writePNG(w, img)
 	})
 }
 
-func saveTmpPNG(tile *zeta.Tile, img image.Image) {
-	buf := &bytes.Buffer{}
-	err := png.Encode(buf, img)
-	if err != nil {
-		log.Println("[saveTmpPNG] failed to encode: ", err)
-		return
-	}
 
-	fname := strings.Replace(tile.Filename(), ".dat", ".tmp.png", -1)
-	fpath := path.Join(tile.Path(), fname)
-	info, _ := os.Stat(fpath)
-	if info == nil {
-		return
-	}
-
-	f, err := os.Create(fpath)
-	if err != nil {
-		log.Println("[saveTmpPNG] failed to open: ", fpath, err)
-		return
-	}
-	defer f.Close()
-
-	i, err := io.Copy(f, buf)
-	if err != nil {
-		log.Println("[saveTmpPNG] failed to copy: ", err, i)
-		return
-	}
-}
 
 // A generate request comes as a posted Tile JSON, without the encoded image of course.
 // generateTile() uses the posted tile as arguments for generating the image

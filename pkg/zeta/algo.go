@@ -119,7 +119,7 @@ func (a *Algo) Compute(ctx context.Context, min, max complex128, size int) []uin
 		}
 
 		a.wg.Add(1)
-		go a.computePatch(ctx, jobID, start, stride, min, max)
+		go a.computePatch(ctx, jobID, start, stride, min, max, size)
 		jobID++
 	}
 
@@ -130,17 +130,17 @@ func (a *Algo) Compute(ctx context.Context, min, max complex128, size int) []uin
 }
 
 // computePatch ...
-func (a *Algo) computePatch(ctx context.Context, jobID, start, stride int, min, max complex128) {
+func (a *Algo) computePatch(ctx context.Context, jobID, start, stride int, min, max complex128, tileWidth int) {
 	defer a.wg.Done()
 
 	ts := time.Now()
 	span := max - min
 
 	for index := start; index < start+stride; index++ {
-		x := index % TileWidth
-		y := index / TileWidth
-		u := float64(x) / float64(TileWidth)
-		v := float64(y) / float64(TileWidth)
+		x := index % tileWidth
+		y := index / tileWidth
+		u := float64(x) / float64(tileWidth)
+		v := float64(y) / float64(tileWidth)
 		s := min + complex(real(span)*u, imag(span)*v)
 
 		select {

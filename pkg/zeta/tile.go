@@ -10,11 +10,13 @@ import (
 	"image"
 	"image/color"
 	"image/draw"
+	"image/png"
 	"io"
 	"log"
 	"math"
 	"net/http"
 	"os"
+	"strings"
 	"path"
 	"strconv"
 
@@ -39,7 +41,7 @@ type Tile struct {
 	Zoom      int      `json:"zoom"`
 	X         int      `json:"x"`
 	Y         int      `json:"y"`
-	Size      int      `json:"size"`
+	Width      int      `json:"width"`
 	Data      []uint16 `json:"data"`
 	upsampled bool
 }
@@ -47,11 +49,11 @@ type Tile struct {
 // Render generates a single tile image using the tile's properties
 func (t *Tile) Render(colors []color.Color) (image.Image, error) {
 
-	rgba := image.NewNRGBA(image.Rect(0, 0, TileWidth, TileWidth))
+	rgba := image.NewNRGBA(image.Rect(0, 0, t.Width, t.Width))
 
 	for i := range t.Data {
-		x := i % TileWidth
-		y := i / TileWidth
+		x := i % t.Width
+		y := i / t.Width
 		c := t.Data[i]
 		rgba.Set(x, y, colors[c])
 	}
@@ -78,7 +80,7 @@ func RequestToTile(r *http.Request) (*Tile, error) {
 		return nil, err
 	}
 
-	t := &Tile{Zoom: zoom, X: x, Y: y}
+	t := &Tile{Zoom: zoom, X: x, Y: y, Width:TileWidth}
 
 	return t, nil
 }
@@ -94,7 +96,7 @@ func ComputeRequest(ctx context.Context, b []byte, luts []*LUT) ([]byte, error) 
 	log.Println("[tile] computing: ", tile)
 
 	algo := &Algo{}
-	tile.Data = algo.Compute(ctx, tile.Min(), tile.Max(), TileWidth*TileWidth)
+	tile.Data = algo.Compute(ctx, tile.Min(), tile.Max(), tile.Width*tile.Width)
 	log.Println("[tile] compute complete: ", tile)
 
 	return json.Marshal(tile)
@@ -102,7 +104,7 @@ func ComputeRequest(ctx context.Context, b []byte, luts []*LUT) ([]byte, error) 
 
 // PPU returns the resolution of this tile in pixels per unit
 func (t *Tile) PPU() int {
-	return int(float64(TileWidth) / (real(t.Max() - t.Min())))
+	return int(float64(t.Width) / (real(t.Max() - t.Min())))
 }
 
 // Min returns the lower left coordinate in 'units' this tile renders
@@ -136,7 +138,7 @@ func (t *Tile) Units() float64 {
 
 // RenderSolid renders a solid color tile of the given color
 func (t *Tile) RenderSolid(bkg color.Color) image.Image {
-	rgba := image.NewRGBA(image.Rect(0, 0, TileWidth, TileWidth))
+	rgba := image.NewRGBA(image.Rect(0, 0, t.Width, t.Width))
 	draw.Draw(rgba, rgba.Bounds(), &image.Uniform{bkg}, image.ZP, draw.Src)
 
 	var img image.Image = rgba
@@ -168,7 +170,7 @@ func (t *Tile) tileCount() float64 {
 }
 
 func (t *Tile) String() string {
-	return fmt.Sprint("zoom:", t.Zoom, " x:", t.X, " y:", t.Y, " ppu:", t.PPU(), " min:", t.Min(), " max:", t.Max(), " units:", t.Units(), " width:", TileWidth)
+	return fmt.Sprint("zoom:", t.Zoom, " x:", t.X, " y:", t.Y, " ppu:", t.PPU(), " min:", t.Min(), " max:", t.Max(), " units:", t.Units(), " width:", t.Width)
 }
 
 // Save saves the binary iteration data from a tile
@@ -221,6 +223,43 @@ func (t *Tile) Load() error {
 		}
 	} else {
 		err = errors.New("Tile not found")
+	}
+
+	return nil
+}
+
+func (t *Tile) SavePNG(colors []color.Color) error {
+
+	img, err := t.Render(colors)
+	if err != nil {
+		return err
+	}
+
+	buf := &bytes.Buffer{}
+	if err := png.Encode(buf, img); err != nil {
+		log.Println("[saveTmpPNG] failed to encode: ", err)
+		return err
+	}
+
+	fname := strings.Replace(t.Filename(), ".dat", ".png", -1)
+	fpath := path.Join(t.Path(), fname)
+	info, _ := os.Stat(fpath)
+	if info != nil {
+		// exists
+		return nil
+	}
+
+	f, err := os.Create(fpath)
+	if err != nil {
+		log.Println("[saveTmpPNG] failed to open: ", fpath, err)
+		return err
+	}
+	defer f.Close()
+
+	i, err := io.Copy(f, buf)
+	if err != nil {
+		log.Println("[saveTmpPNG] failed to copy: ", err, i)
+		return err
 	}
 
 	return nil

@@ -85,7 +85,7 @@ func (p *Patch) Split() ([]*zeta.Tile, error) {
 		tiles[i] = &zeta.Tile{
 			Zoom: int(p.Zoom),
 			Data: make([]uint16, zeta.TileWidth*zeta.TileWidth),
-			Size: zeta.TileWidth,
+			Width: zeta.TileWidth,
 		}
 
 		for row := 0; row < zeta.TileWidth; row++ {
