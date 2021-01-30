@@ -26,7 +26,7 @@ import (
 // 	}
 // 	fmt.Println("}")
 // }
-var reverse map[color.RGBA]uint32
+var reverse map[color.RGBA]uint16
 
 func init() {
 
@@ -99,15 +99,15 @@ var (
 // Algo ...
 type Algo struct {
 	ppu  int
-	data []uint32
+	data []uint16
 	luts []*LUT
 	wg   *sync.WaitGroup
 }
 
 // Compute ...
-func (a *Algo) Compute(ctx context.Context, min, max complex128, luts []*LUT) []uint32 {
+func (a *Algo) Compute(ctx context.Context, min, max complex128, luts []*LUT) []uint16 {
 	a.ppu = int(float64(TileWidth) / (real(max - min)))
-	a.data = make([]uint32, TileWidth*TileWidth)
+	a.data = make([]uint16, TileWidth*TileWidth)
 	a.luts = luts
 	a.wg = &sync.WaitGroup{}
 
@@ -153,7 +153,7 @@ func (a *Algo) computePatch(ctx context.Context, jobID, start, stride int, min, 
 		default:
 		}
 
-		var its uint32
+		var its uint16
 
 		if a.luts == nil {
 			its = iterate(s, 1e-15)
@@ -196,8 +196,8 @@ func (a *Algo) computePatch(ctx context.Context, jobID, start, stride int, min, 
 	}
 }
 
-func iterate(s complex128, epsilon float64) uint32 {
-	var i uint32
+func iterate(s complex128, epsilon float64) uint16 {
+	var i uint16
 	var cabsz float64
 	var diff float64 = 100
 

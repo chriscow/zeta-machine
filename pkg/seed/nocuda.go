@@ -2,13 +2,10 @@
 
 package seed
 
-import "math/rand"
-
-// Generate tile data via call to cuda zeta machine library
-func Generate(p Patch) []uint32 {
-	data := make([]uint32, PatchWidth*PatchWidth)
-	for i := range data {
-		data[i] = rand.Uint32()
+// Generates tile data via call to cuda zeta machine library
+func (p *Patch) Generate() {
+	p.Data = make([]uint16, PatchWidth*PatchWidth)
+	for i := range p.Data {
+		p.Data[i] = uint16(i % 5000) // max iterations
 	}
-	return data
 }

@@ -40,7 +40,7 @@ type Tile struct {
 	X         int      `json:"x"`
 	Y         int      `json:"y"`
 	Size      int      `json:"size"`
-	Data      []uint32 `json:"data"`
+	Data      []uint16 `json:"data"`
 	upsampled bool
 }
 

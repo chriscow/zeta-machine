@@ -4,7 +4,10 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
+	"fmt"
 	"log"
+	"time"
+	"zetamachine/pkg/zeta"
 
 	"github.com/go-chi/valve"
 	"github.com/nsqio/go-nsq"
@@ -22,17 +25,24 @@ import (
 //
 const (
 	requestPatchTopic = "patch-request"
+	nsqMaxMsgSize     = 1048576
 )
 
+// Starter is a basic interface that provides a Start() method
 type Starter interface {
 	Start()
 }
 
+// CudaServer waits for messages requesting the generation of a tile patch
+// then generates the data on the GPU, splits the patch into 16 tiles
+// and publishes each individual tile.
 type CudaServer struct {
 	producer *nsq.Producer
 	valve    *valve.Valve
 }
 
+// NewCudaServer constructs a CudaServer by creating internal structures
+// such as an NSQ Producer for publishing generated tiles
 func NewCudaServer(v *valve.Valve) (*CudaServer, error) {
 
 	config := nsq.NewConfig()
@@ -49,7 +59,7 @@ func NewCudaServer(v *valve.Valve) (*CudaServer, error) {
 	return &server, nil
 }
 
-// Start ...
+// Start starts the NSQ consumer to service request messages
 func (s *CudaServer) Start() {
 	go func() {
 		if err := StartConsumer(s.valve.Context(), requestPatchTopic, "patch-generator", 1, s); err != nil {
@@ -58,7 +68,7 @@ func (s *CudaServer) Start() {
 	}()
 }
 
-// HandleMessage ...
+// HandleMessage is called by the NSQ consumer when a request for a patch is received.
 func (s *CudaServer) HandleMessage(msg *nsq.Message) error {
 	if err := s.valve.Open(); err != nil {
 		log.Println("[server] failed to open valve: ", err)
@@ -66,38 +76,79 @@ func (s *CudaServer) HandleMessage(msg *nsq.Message) error {
 	}
 	defer s.valve.Close()
 
-	var patch Patch
-
-	if err := json.Unmarshal(msg.Body, &patch); err != nil {
+	patch := &Patch{}
+	if err := json.Unmarshal(msg.Body, patch); err != nil {
 		log.Println("[cuda server] Error unmarshalling msg body: ", err)
 		return err
 	}
 
-	log.Println("[cuda server] Received request for tile:", patch)
-	patch.Data = Generate(patch)
+	// GeneratePatch creates all the patch / tile data
+	// splits the patch into 4 tiles.
+	start := time.Now()
+	patch.Generate()
+	genTime := time.Since(start)
 
-	json, err := json.Marshal(patch)
+	tiles, err := patch.Split()
 	if err != nil {
-		log.Println("[cuda server] Error marshalling patch: ", err)
+		log.Println("[cuda server] error splitting patch:", err)
 		return err
 	}
 
-	buf := &bytes.Buffer{}
-	w := gzip.NewWriter(buf)
-	_, err = w.Write(json)
+	// Publish the 16 tiles for storage.
+	for i := range tiles {
+		if err := s.publishTile(tiles[i]); err != nil {
+			// Move this patch request message to the errors topic
+			if err := s.producer.Publish("patch-errors", msg.Body); err != nil {
+				log.Println("[cuda server] error publishing error message:", err)
+			}
+			break
+		}
+	}
+	log.Println("[cuda server] patch generated in:", genTime, " total time:", time.Since(start))
+
+	return nil
+}
+
+func (s *CudaServer) publishTile(tile *zeta.Tile) error {
+	json, err := json.Marshal(tile)
 	if err != nil {
-		w.Close()
-		log.Println("[cuda server] Error writing compressed json bytes to buffer:", err)
+		log.Println("[cuda server] Error marshalling tile: ", err)
 		return err
 	}
-	w.Close()
 
-	log.Println("[cuda server] json size:", len(json), "after gzip:", len(buf.Bytes()))
+	// json, err = compress(json)
+	// if err != nil {
+	// 	log.Println("[cuda server] Error compressing tile:", err)
+	// 	return err
+	// }
 
-	if err := s.producer.Publish("patch-response", buf.Bytes()); err != nil {
+	// If the compressed tile is still too large, publish the original
+	// request to the `patch-errors` topic and move on
+	if len(json) > nsqMaxMsgSize {
+		log.Println("[cuda server] tile too large:", tile)
+		return fmt.Errorf("tile to large:%d bytes", len(json)) // swallow msg from this topic
+	}
+
+	// Send the tile to be stored
+	if err := s.producer.Publish("patch-response", json); err != nil {
 		log.Println("[cuda server] Error publishing response:", err)
 		return err
 	}
 
 	return nil
+}
+
+func compress(b []byte) ([]byte, error) {
+	buf := &bytes.Buffer{}
+	w := gzip.NewWriter(buf)
+	_, err := w.Write(b)
+	if err != nil {
+		w.Close()
+		log.Println("[cuda server] Error writing compressed json bytes to buffer:", err)
+		return nil, err
+	}
+	w.Close()
+
+	// log.Println("[cuda server] json size:", len(b), "after gzip:", len(buf.Bytes()))
+	return buf.Bytes(), nil
 }

@@ -18,15 +18,13 @@ void generate(double minR, double maxR, double minI, double maxI, unsigned int s
 import "C"
 
 // Generate tile data via call to cuda zeta machine library
-func Generate(p Patch) []uint32 {
+func (p *Patch) Generate() {
 	buf := make([]C.uint, p.Size*p.Size)
 
 	C.generate(C.double(p.Min[0]), C.double(p.Max[0]), C.double(p.Min[1]), C.double(p.Max[1]), C.uint(p.Size), &buf[0])
 
-	data := make([]uint32, len(buf))
+	p.Data = make([]uint32, len(buf))
 	for i := range buf {
-		data[i] = uint32(buf[i])
+		p.Data[i] = uint32(buf[i])
 	}
-
-	return data
 }

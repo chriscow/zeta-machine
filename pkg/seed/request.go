@@ -10,16 +10,22 @@ import (
 	"github.com/nsqio/go-nsq"
 )
 
+const (
+	// These are the ranges we want to render
+	xRange = 512.0  // in each direction: -512 -> 512
+	yRange = 4096.0 // same
+)
+
 // Requester ...
 type Requester struct {
 	producer *nsq.Producer
 	valve    *valve.Valve
-	minZoom  int
-	maxZoom  int
+	minZoom  uint8
+	maxZoom  uint8
 }
 
 // NewRequester ...
-func NewRequester(v *valve.Valve, minZoom, maxZoom int) (*Requester, error) {
+func NewRequester(v *valve.Valve, minZoom, maxZoom uint8) (*Requester, error) {
 	config := nsq.NewConfig()
 	p, err := nsq.NewProducer("127.0.0.1:4150", config)
 	if err != nil {
@@ -40,8 +46,10 @@ func (r *Requester) Start() {
 	go func() {
 		defer r.producer.Stop()
 
+		var count uint64
+
 		// tileCount := int(math.Pow(2, float64(zoom+1)))
-		for zoom := r.minZoom; zoom <= r.maxZoom; zoom++ {
+		for zoom := uint8(1); zoom <= r.maxZoom; zoom++ {
 
 			requested := 0
 			skipped := 0
@@ -49,11 +57,20 @@ func (r *Requester) Start() {
 			ppu := math.Pow(2, float64(zoom))
 			units := float64(PatchWidth) / ppu // units per patch
 
-		loop:
-			for rl := -xRange; rl < xRange; rl += units {
-				for im := -yRange; im < yRange; im += units {
+			// how many patches in each direction
+			xCount := int(math.Max(1, xRange/units))
+			yCount := int(math.Max(1, yRange/units))
 
-					patch := NewPatch(zoom, complex(rl, im), complex(rl+units, im+units))
+		loop:
+			for x := -xCount; x < xCount; x++ {
+				for y := -yCount; y < yCount; y++ {
+
+					rl := -xRange + units*float64(x+xCount)
+					im := -yRange + units*float64(y+yCount)
+
+					patch := NewPatch(count, zoom, complex(rl, im), complex(rl+units, im+units), x, y)
+					count++
+
 					sent, err := r.send(patch)
 					if err != nil {
 						log.Fatal(err)
