@@ -10,7 +10,6 @@ import (
 	"syscall"
 	"time"
 	"zetamachine/pkg/seed"
-	"zetamachine/pkg/zeta"
 
 	"github.com/go-chi/valve"
 	"github.com/joho/godotenv"
@@ -43,7 +42,7 @@ func main() {
 
 	switch *role {
 	case "make":
-		p := seed.NewPatch(0, 0, complex(-30, -30), complex(30, 30), 0, 0, zeta.TileWidth)
+		p := seed.NewPatch(0, 0, complex(-30, -30), complex(30, 30), 0, 0, seed.PatchWidth)
 		p.Generate(context.Background())
 		p.SavePNG()
 		os.Exit(0)

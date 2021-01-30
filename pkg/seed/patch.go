@@ -2,7 +2,6 @@ package seed
 
 import (
 	"fmt"
-	"math"
 	"zetamachine/pkg/palette"
 	"zetamachine/pkg/zeta"
 )
@@ -71,14 +70,11 @@ func (p *Patch) GetMax() complex128 {
 
 // SavePNG ...
 func (p *Patch) SavePNG() error {
-	ppu := math.Pow(2, float64(p.Zoom))
-	units := p.Max[0] - p.Min[0]
-
 	tile := zeta.Tile{
 		Zoom:  int(p.Zoom),
 		X:     p.X,
 		Y:     p.Y,
-		Width: int(units * ppu),
+		Width: p.Width,
 		Data:  p.Data,
 	}
 
