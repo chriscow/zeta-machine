@@ -5,7 +5,6 @@ import (
 	"compress/gzip"
 	"encoding/json"
 	"log"
-	"time"
 
 	"github.com/go-chi/valve"
 	"github.com/nsqio/go-nsq"
@@ -25,13 +24,16 @@ const (
 	requestPatchTopic = "patch-request"
 )
 
-type cudaServer struct {
-	producer *nsq.Producer
-	v        *valve.Valve
+type Starter interface {
+	Start()
 }
 
-func NewCudaServer() (*cudaServer, error) {
-	v := valve.New()
+type CudaServer struct {
+	producer *nsq.Producer
+	valve    *valve.Valve
+}
+
+func NewCudaServer(v *valve.Valve) (*CudaServer, error) {
 
 	config := nsq.NewConfig()
 	p, err := nsq.NewProducer("127.0.0.1:4150", config)
@@ -39,30 +41,30 @@ func NewCudaServer() (*cudaServer, error) {
 		log.Fatal("Could not connect to nsqd: ", err)
 	}
 
-	server := cudaServer{
+	server := CudaServer{
 		producer: p,
-		v:        v,
+		valve:    v,
 	}
-
-	go func() {
-		if err := StartConsumer(v.Context(), requestPatchTopic, "patch-generator", 1, &server); err != nil {
-			log.Fatal(err)
-		}
-	}()
 
 	return &server, nil
 }
 
-func (s *cudaServer) Close() {
-	s.v.Shutdown(20 * time.Second)
+// Start ...
+func (s *CudaServer) Start() {
+	go func() {
+		if err := StartConsumer(s.valve.Context(), requestPatchTopic, "patch-generator", 1, s); err != nil {
+			log.Fatal(err)
+		}
+	}()
 }
 
-func (s *cudaServer) HandleMessage(msg *nsq.Message) error {
-	if err := s.v.Open(); err != nil {
+// HandleMessage ...
+func (s *CudaServer) HandleMessage(msg *nsq.Message) error {
+	if err := s.valve.Open(); err != nil {
 		log.Println("[server] failed to open valve: ", err)
 		return err
 	}
-	defer s.v.Close()
+	defer s.valve.Close()
 
 	var patch Patch
 

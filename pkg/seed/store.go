@@ -26,16 +26,14 @@ func NewStore(v *valve.Valve) (*Store, error) {
 		valve: v,
 	}
 
-	log.Println("[store] starting consumer on ", storeTopic, " `store`")
-	maxInFlight := runtime.GOMAXPROCS(0)
-	go StartConsumer(v.Context(), storeTopic, "store", maxInFlight, s)
-
 	return s, nil
 }
 
-// Shutdown ...
-func (s *Store) Shutdown() {
-	// noop
+// Start ...
+func (s *Store) Start() {
+	log.Println("[store] starting consumer on ", storeTopic, " `store`")
+	maxInFlight := runtime.GOMAXPROCS(0)
+	go StartConsumer(s.valve.Context(), storeTopic, "store", maxInFlight, s)
 }
 
 // HandleMessage handles completed tiles from the Generator and stores them
@@ -59,28 +57,25 @@ func (s *Store) HandleMessage(m *nsq.Message) error {
 
 	// 		patch := NewPatch(complex(rl, im), complex(rl+units, im+units))
 
-	patch := Patch{}
-	if err := json.Unmarshal(m.Body, &patch); err != nil {
+	patch := &Patch{}
+	if err := json.Unmarshal(m.Body, patch); err != nil {
 		log.Println("[store] failed to unmarshal patch: ", err)
 		return err
 	}
 
 	log.Println("[store] received patch for storage: ", patch)
 
-	// ppu := math.Pow(2, float64(patch.Zoom)) // pixels per unit
-	// units := patch.Max[0] - patch.Min[0]    // patch spans this many units
-	// upt := zeta.TileWidth / ppu             // units per tile
-	// tileCount := units / ppu
-
 	//
 	// Copy the patch data into the individual tiles, two at a time
 	//
+	saveTiles(patch, 0)
+	saveTiles(patch, zeta.TileWidth)
 
 	// Returning a non-nil error will automatically send a REQ command to NSQ to re-queue the message.
 	return nil
 }
 
-func saveTiles(patch Patch, rowStart int) error {
+func saveTiles(patch *Patch, rowStart int) error {
 	tile1 := &zeta.Tile{
 		Zoom: patch.Zoom,
 		Data: make([]uint32, zeta.TileWidth*zeta.TileWidth),
@@ -93,9 +88,13 @@ func saveTiles(patch Patch, rowStart int) error {
 		Size: zeta.TileWidth,
 	}
 
-	// Patch data encompasses 4 tiles
-	//			____ ____
-	//			|   |    |
+	// Patch data encompasses 4 tiles, each width and height are the same
+	//			 ____ ____
+	//			|    |    |
+	//			|____|____|
+	//			|    |    |
+	//			|____|____|
+	//
 	for i := 0; i < zeta.TileWidth; i++ {
 		copy(tile1.Data[rowStart+i:], patch.Data[rowStart+i:zeta.TileWidth])
 		copy(tile2.Data[rowStart+i:], patch.Data[rowStart+i+zeta.TileWidth:zeta.TileWidth])
@@ -116,4 +115,7 @@ func saveTiles(patch Patch, rowStart int) error {
 		log.Println("\t", err)
 		return err
 	}
+	log.Println("[store] saved tile:", tile1)
+	log.Println("[store] saved tile:", tile2)
+	return nil
 }

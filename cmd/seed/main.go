@@ -8,8 +8,7 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
-
-	"zetamachine/pkg/msg"
+	"zetamachine/pkg/seed"
 
 	"github.com/go-chi/valve"
 	"github.com/joho/godotenv"
@@ -27,7 +26,7 @@ func main() {
 	}
 
 	minZoom := flag.Int("min-zoom", 0, "minimum zoom to start checking for missing tiles")
-	zoom := flag.Int("zoom", 4, "maximum zoom level to generate tiles")
+	maxZoom := flag.Int("max-zoom", 4, "maximum zoom level to generate tiles")
 
 	role := flag.String("role", "", "store, request, generate")
 	flag.Parse()
@@ -36,35 +35,48 @@ func main() {
 		log.Fatal("Role not specified")
 	}
 
-	v := valve.New()
-	wait := true
-
-	var handler msg.Server
 	var err error
+	var server seed.Starter
+	v := valve.New()
 
-	switch (*role)[:3] {
+	switch *role {
 	case "sto":
-		handler, err = msg.NewStore(v)
-	case "req":
-		handler, err = NewRequester()
+		fallthrough
+	case "store":
+		server, err = seed.NewStore(v)
 		if err != nil {
 			log.Fatal(err)
 		}
-		bulkRequest(*minZoom, *zoom, 0, *maxAge, handler)
-		wait = false
+	case "req":
+		fallthrough
+	case "request":
+		server, err = seed.NewRequester(v, *minZoom, *maxZoom)
 	case "gen":
-		handler, err = msg.NewGenerator(v)
+		fallthrough
+	case "generate":
+		server, err = seed.NewCudaServer(v)
 	default:
 		log.Fatal("Unknown role: ", role)
 	}
 
-	if wait {
-		log.Println("[seed] Waiting for signal to exit")
-		// wait for signal to exit
-		sigChan := make(chan os.Signal, 1)
-		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-		<-sigChan
-		log.Println("[seed] Signaled to exit. Stopping NSQ")
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Println(1)
+	log.Println(server)
+	server.Start()
+	log.Println(2)
+
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+	log.Println("[seed] Waiting for signal to exit")
+
+	select {
+	case <-sigChan:
+		log.Println("[seed] received termination request")
+	case <-v.Stop():
+		log.Println("[seed] process completed")
 	}
 
 	log.Println("[seed] Waiting for processes to finish...")

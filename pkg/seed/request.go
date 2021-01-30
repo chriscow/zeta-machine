@@ -2,10 +2,10 @@ package seed
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"math"
-	"time"
+
+	"github.com/go-chi/valve"
 
 	"github.com/nsqio/go-nsq"
 )
@@ -13,10 +13,13 @@ import (
 // Requester ...
 type Requester struct {
 	producer *nsq.Producer
+	valve    *valve.Valve
+	minZoom  int
+	maxZoom  int
 }
 
 // NewRequester ...
-func NewRequester() (*Requester, error) {
+func NewRequester(v *valve.Valve, minZoom, maxZoom int) (*Requester, error) {
 	config := nsq.NewConfig()
 	p, err := nsq.NewProducer("127.0.0.1:4150", config)
 	if err != nil {
@@ -24,16 +27,59 @@ func NewRequester() (*Requester, error) {
 		return nil, err
 	}
 
-	return &Requester{producer: p}, nil
+	return &Requester{
+		producer: p,
+		valve:    v,
+		minZoom:  minZoom,
+		maxZoom:  maxZoom,
+	}, nil
 }
 
-// Close ...
-func (r *Requester) Close() {
-	r.producer.Stop()
+// Start ...
+func (r *Requester) Start() {
+	go func() {
+		defer r.producer.Stop()
+
+		// tileCount := int(math.Pow(2, float64(zoom+1)))
+		for zoom := r.minZoom; zoom <= r.maxZoom; zoom++ {
+
+			requested := 0
+			skipped := 0
+
+			ppu := math.Pow(2, float64(zoom))
+			units := float64(PatchWidth) / ppu // units per patch
+
+		loop:
+			for rl := -xRange; rl < xRange; rl += units {
+				for im := -yRange; im < yRange; im += units {
+
+					patch := NewPatch(zoom, complex(rl, im), complex(rl+units, im+units))
+					sent, err := r.send(patch)
+					if err != nil {
+						log.Fatal(err)
+					}
+
+					if !sent {
+						skipped++
+						continue
+					}
+					requested++
+
+					select {
+					case <-r.valve.Stop(): // valve is being shutdown
+						break loop
+					default:
+					}
+				}
+			}
+			log.Println("zoom:", zoom, "done. sent:", requested, "skipped:", skipped)
+		}
+		r.valve.Shutdown(0)
+	}()
 }
 
 // Send ...
-func (r *Requester) Send(tile *Patch) (bool, error) {
+func (r *Requester) send(tile *Patch) (bool, error) {
 
 	msg, err := json.Marshal(tile)
 	if err != nil {
@@ -50,38 +96,4 @@ func (r *Requester) Send(tile *Patch) (bool, error) {
 	}
 
 	return true, nil
-}
-
-func (r *Requester) bulkRequest(minZoom, zoom, limit int, maxAge time.Duration) {
-	log.Println("requesting tiles for zoom: ", zoom)
-
-	// tileCount := int(math.Pow(2, float64(zoom+1)))
-	for z := minZoom; z <= zoom; z++ {
-
-		requested := 0
-		skipped := 0
-
-		ppu := math.Pow(2, float64(z))
-		units := float64(PatchWidth) / ppu // units per patch
-
-		for rl := -xRange; rl < xRange; rl += units {
-			for im := -yRange; im < yRange; im += units {
-
-				patch := NewPatch(z, complex(rl, im), complex(rl+units, im+units))
-				sent, err := r.Send(patch)
-				if err != nil {
-					log.Fatal(err)
-				}
-
-				if !sent {
-					skipped++
-					continue
-				}
-				requested++
-			}
-		}
-
-		fmt.Println()
-		log.Println("zoom", z, "complete. sent:", requested, "skipped:", skipped)
-	}
 }
