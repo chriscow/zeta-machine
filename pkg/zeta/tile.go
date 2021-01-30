@@ -16,9 +16,9 @@ import (
 	"math"
 	"net/http"
 	"os"
-	"strings"
 	"path"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi"
 )
@@ -41,7 +41,7 @@ type Tile struct {
 	Zoom      int      `json:"zoom"`
 	X         int      `json:"x"`
 	Y         int      `json:"y"`
-	Width      int      `json:"width"`
+	Width     int      `json:"width"`
 	Data      []uint16 `json:"data"`
 	upsampled bool
 }
@@ -80,7 +80,7 @@ func RequestToTile(r *http.Request) (*Tile, error) {
 		return nil, err
 	}
 
-	t := &Tile{Zoom: zoom, X: x, Y: y, Width:TileWidth}
+	t := &Tile{Zoom: zoom, X: x, Y: y, Width: TileWidth}
 
 	return t, nil
 }

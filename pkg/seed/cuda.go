@@ -4,6 +4,7 @@ package seed
 
 import (
 	"context"
+	"log"
 )
 
 // compile the cuda code from the root workspace folder with:
@@ -23,12 +24,14 @@ import "C"
 
 // Generate tile data via call to cuda zeta machine library
 func (p *Patch) Generate(ctx context.Context) {
-	buf := make([]C.uint, p.Size*p.Size)
+	log.Println("[generate] patch:", p)
 
-	C.generate(C.double(p.Min[0]), C.double(p.Max[0]), C.double(p.Min[1]), C.double(p.Max[1]), C.uint(p.Size), &buf[0])
+	buf := make([]C.uint, PatchWidth*PatchWidth)
 
-	p.Data = make([]uint32, len(buf))
+	C.generate(C.double(p.Min[0]), C.double(p.Max[0]), C.double(p.Min[1]), C.double(p.Max[1]), C.uint(PatchWidth), &buf[0])
+
+	p.Data = make([]uint16, len(buf))
 	for i := range buf {
-		p.Data[i] = uint32(buf[i])
+		p.Data[i] = uint16(buf[i])
 	}
 }

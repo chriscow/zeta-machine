@@ -46,10 +46,12 @@ func (r *Requester) Start() {
 	go func() {
 		defer r.producer.Stop()
 
+		log.Println("[request] zoom:", r.minZoom, "-", r.maxZoom)
+
 		var count uint64
 
 		// tileCount := int(math.Pow(2, float64(zoom+1)))
-		for zoom := uint8(1); zoom <= r.maxZoom; zoom++ {
+		for zoom := r.minZoom; zoom <= r.maxZoom; zoom++ {
 
 			requested := 0
 			skipped := 0
@@ -57,19 +59,25 @@ func (r *Requester) Start() {
 			ppu := math.Pow(2, float64(zoom))
 			units := float64(PatchWidth) / ppu // units per patch
 
+			// handles the case for zoom == 0 because
+			// xRange is only 512 and that is less than a single patch
+			xr := math.Max(1024, xRange)
+
 			// how many patches in each direction
-			xCount := int(math.Max(1, xRange/units))
-			yCount := int(math.Max(1, yRange/units))
+			xCount := int(xr / units)
+			yCount := int(yRange / units)
 
 		loop:
 			for x := -xCount; x < xCount; x++ {
 				for y := -yCount; y < yCount; y++ {
 
-					rl := -xRange + units*float64(x+xCount)
+					rl := -xr + units*float64(x+xCount)
 					im := -yRange + units*float64(y+yCount)
 
 					patch := NewPatch(count, zoom, complex(rl, im), complex(rl+units, im+units), x, y)
 					count++
+
+					log.Println("[request] patch:", patch)
 
 					sent, err := r.send(patch)
 					if err != nil {

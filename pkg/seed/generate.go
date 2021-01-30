@@ -97,7 +97,6 @@ loop:
 	for {
 		select {
 		case <-done:
-			log.Println("[cuda server] generate complete")
 			break loop
 		case <-ticker.C:
 			log.Println("[cuda server] touching message")
