@@ -98,17 +98,14 @@ var (
 
 // Algo ...
 type Algo struct {
-	ppu  int
 	data []uint16
-	luts []*LUT
 	wg   *sync.WaitGroup
 }
 
 // Compute ...
-func (a *Algo) Compute(ctx context.Context, min, max complex128, luts []*LUT) []uint16 {
-	a.ppu = int(float64(TileWidth) / (real(max - min)))
-	a.data = make([]uint16, TileWidth*TileWidth)
-	a.luts = luts
+func (a *Algo) Compute(ctx context.Context, min, max complex128, size int) []uint16 {
+	// a.ppu = int(float64(TileWidth) / (real(max - min)))
+	a.data = make([]uint16, size)
 	a.wg = &sync.WaitGroup{}
 
 	stride := len(a.data) / runtime.GOMAXPROCS(0) //TileWidth * TileWidth / 8 // 8 jobs per tile
@@ -155,39 +152,7 @@ func (a *Algo) computePatch(ctx context.Context, jobID, start, stride int, min, 
 
 		var its uint16
 
-		if a.luts == nil {
-			its = iterate(s, 1e-15)
-		} else {
-			z := zeta(s)
-			for l := range a.luts {
-				if c, ok := a.luts[l].Lookup(z, a.ppu); ok {
-					tmp := iterate(s, 1e-15)
-
-					check := color.RGBA{
-						R: cc[tmp*3],
-						G: cc[tmp*3+1],
-						B: cc[tmp*3+2],
-						A: 255,
-					}
-
-					its = reverse[c]
-
-					if check != c {
-						log.Println("color mismatch", c, check)
-					}
-
-					if tmp != its {
-						log.Println("iterations mismatch", its, tmp)
-					}
-
-					panic("lookup tables aren't accurate. multiple iteration values can result in the same color")
-					break
-				} else {
-					its = iterate(s, 1e-15)
-				}
-			}
-		}
-
+		its = iterate(s, 1e-15)
 		a.data[index] = its
 	}
 

@@ -94,7 +94,7 @@ func ComputeRequest(ctx context.Context, b []byte, luts []*LUT) ([]byte, error) 
 	log.Println("[tile] computing: ", tile)
 
 	algo := &Algo{}
-	tile.Data = algo.Compute(ctx, tile.Min(), tile.Max(), luts)
+	tile.Data = algo.Compute(ctx, tile.Min(), tile.Max(), TileWidth*TileWidth)
 	log.Println("[tile] compute complete: ", tile)
 
 	return json.Marshal(tile)

@@ -85,7 +85,25 @@ func (s *CudaServer) HandleMessage(msg *nsq.Message) error {
 	// GeneratePatch creates all the patch / tile data
 	// splits the patch into 4 tiles.
 	start := time.Now()
-	patch.Generate()
+	ticker := time.NewTicker(touchSec * time.Second)
+	done := make(chan bool)
+	go func() {
+		patch.Generate(s.valve.Context())
+		close(done)
+	}()
+
+loop:
+	for {
+		select {
+		case <-done:
+			log.Println("[cuda server] generate complete")
+			break loop
+		case <-ticker.C:
+			log.Println("[cuda server] touching message")
+			msg.Touch()
+		}
+	}
+
 	genTime := time.Since(start)
 
 	tiles, err := patch.Split()
