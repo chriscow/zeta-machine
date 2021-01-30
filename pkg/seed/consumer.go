@@ -1,4 +1,4 @@
-package msg
+package seed
 
 import (
 	"context"
@@ -9,17 +9,8 @@ import (
 )
 
 const (
-	RequestTopic = "request-tile"
-	StoreTopic   = "store-tile"
-	StoreChan    = "store-tile"
-	GenChan      = "generate"
-	touchSec     = 30 // touch the message every so often
+	touchSec = 30 // touch the message every so often
 )
-
-// Server interface provides a Shutdown method
-type Server interface {
-	Shutdown()
-}
 
 func checkEnv() {
 	if os.Getenv("ZETA_NSQLOOKUP") == "" {

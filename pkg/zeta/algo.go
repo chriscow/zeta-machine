@@ -26,7 +26,7 @@ import (
 // 	}
 // 	fmt.Println("}")
 // }
-var reverse map[color.RGBA]uint8
+var reverse map[color.RGBA]uint32
 
 func init() {
 
@@ -99,15 +99,15 @@ var (
 // Algo ...
 type Algo struct {
 	ppu  int
-	data []uint8
+	data []uint32
 	luts []*LUT
 	wg   *sync.WaitGroup
 }
 
 // Compute ...
-func (a *Algo) Compute(ctx context.Context, min, max complex128, luts []*LUT) []uint8 {
+func (a *Algo) Compute(ctx context.Context, min, max complex128, luts []*LUT) []uint32 {
 	a.ppu = int(float64(TileWidth) / (real(max - min)))
-	a.data = make([]uint8, TileWidth*TileWidth)
+	a.data = make([]uint32, TileWidth*TileWidth)
 	a.luts = luts
 	a.wg = &sync.WaitGroup{}
 
@@ -153,7 +153,7 @@ func (a *Algo) computePatch(ctx context.Context, jobID, start, stride int, min, 
 		default:
 		}
 
-		var its uint8
+		var its uint32
 
 		if a.luts == nil {
 			its = iterate(s, 1e-15)
@@ -196,8 +196,8 @@ func (a *Algo) computePatch(ctx context.Context, jobID, start, stride int, min, 
 	}
 }
 
-func iterate(s complex128, epsilon float64) uint8 {
-	var i int
+func iterate(s complex128, epsilon float64) uint32 {
+	var i uint32
 	var cabsz float64
 	var diff float64 = 100
 
@@ -223,7 +223,7 @@ func iterate(s complex128, epsilon float64) uint8 {
 		log.Fatal("Iterations overflows uint8. iterations:", i, " s:", s)
 	}
 
-	return uint8(i)
+	return i
 }
 
 func zeta(s complex128) complex128 {

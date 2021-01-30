@@ -8,7 +8,6 @@ import (
 	"os"
 	"strings"
 	"time"
-	"zetamachine/pkg/msg"
 	"zetamachine/pkg/zeta"
 
 	"github.com/go-chi/valve"
@@ -24,7 +23,6 @@ type Server struct {
 	port       string
 	subdomains []string
 	luts       []*zeta.LUT
-	store      *msg.Store
 	valve      *valve.Valve
 }
 
@@ -67,13 +65,6 @@ func (s *Server) config() error {
 	s.port = os.Getenv("ZETA_PORT")
 	s.subdomains = strings.Split(os.Getenv("ZETA_SUBDOMAINS"), ",")
 	s.valve = valve.New()
-
-	store, err := msg.NewStore(s.valve)
-	if err != nil {
-		log.Println("[server] failed to create store: ", err)
-		return err
-	}
-	s.store = store
 
 	http.DefaultTransport.(*http.Transport).MaxIdleConnsPerHost = 8
 

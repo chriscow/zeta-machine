@@ -3,7 +3,7 @@ package zeta
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
+	"encoding/gob"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,7 +17,6 @@ import (
 	"os"
 	"path"
 	"strconv"
-	"time"
 
 	"github.com/go-chi/chi"
 )
@@ -37,23 +36,23 @@ const (
 // Tile holds information for generating a single zeta tile at a particular
 // zoom level
 type Tile struct {
-	Zoom      int    `json:"zoom"`
-	X         int    `json:"x"`
-	Y         int    `json:"y"`
-	Size      int    `json:"size"`
-	Data      string `json:"data"`
+	Zoom      int      `json:"zoom"`
+	X         int      `json:"x"`
+	Y         int      `json:"y"`
+	Size      int      `json:"size"`
+	Data      []uint32 `json:"data"`
 	upsampled bool
 }
 
 // Render generates a single tile image using the tile's properties
-func (t *Tile) Render(data []uint8, colors []color.Color) (image.Image, error) {
+func (t *Tile) Render(colors []color.Color) (image.Image, error) {
 
 	rgba := image.NewNRGBA(image.Rect(0, 0, TileWidth, TileWidth))
 
-	for i := range data {
+	for i := range t.Data {
 		x := i % TileWidth
 		y := i / TileWidth
-		c := data[i]
+		c := t.Data[i]
 		rgba.Set(x, y, colors[c])
 	}
 	var img image.Image = rgba
@@ -95,8 +94,7 @@ func ComputeRequest(ctx context.Context, b []byte, luts []*LUT) ([]byte, error) 
 	log.Println("[tile] computing: ", tile)
 
 	algo := &Algo{}
-	data := algo.Compute(ctx, tile.Min(), tile.Max(), luts)
-	tile.Data = base64.StdEncoding.EncodeToString(data)
+	tile.Data = algo.Compute(ctx, tile.Min(), tile.Max(), luts)
 	log.Println("[tile] compute complete: ", tile)
 
 	return json.Marshal(tile)
@@ -136,30 +134,6 @@ func (t *Tile) Units() float64 {
 	return TotalUnits / t.tileCount()
 }
 
-// IsBackground tries to determine if the tile would be rendered the background
-// color and skips the calculations required so we can simply return a solid
-// color
-func (t *Tile) IsBackground() bool {
-	// tile := tile.Tile{
-	// 	Size:       size,
-	// 	Zoom:       zoom,
-	// 	X:          x,
-	// 	Y:          y,
-	// 	TotalUnits: TotalUnits,
-	// 	GlobalMin:  GlobalMin,
-	// }
-
-	// max := tile.Max()
-	// min := tile.Min()
-	// if zoom > 3 && (real(min) >= 20) {
-	// 	fmt.Println("tile:", x, y, "min:", min)
-	// 	return true
-	// }
-
-	// fmt.Println("zoom:", zoom, "tile:", x, y, "extents:", min, max)
-	return false
-}
-
 // RenderSolid renders a solid color tile of the given color
 func (t *Tile) RenderSolid(bkg color.Color) image.Image {
 	rgba := image.NewRGBA(image.Rect(0, 0, TileWidth, TileWidth))
@@ -187,82 +161,6 @@ func (t *Tile) Exists() (os.FileInfo, error) {
 	return os.Stat(fname)
 }
 
-// ShouldGenerate checks for the existence of the tile and also for the temp file
-// created when a tile is requested.
-// If the tile data already exists, ShouldGenerate returns true and makes sure
-// there is no temporary .req file still hanging around.
-//
-// If the tile data doesn't exist, we check for a temporary .req file in its place
-// to see if it has recently been requested to avoid re-requesting generation.
-//
-// If we find a .req file AND it is less than `maxAgeMin` minuites old we return false. It is
-// already in the queue to be generated. If it is older than 24 hours, we delete
-// the temporary .req file and re-request generation.
-//
-func (t *Tile) ShouldGenerate(maxAge time.Duration) (bool, error) {
-	// the tile tile already exists, return not ok
-	existing, err := t.Exists()
-	if existing != nil {
-		// Since the tile data already exists, make sure there isn't a
-		// left over .req temp file hanging around
-		t.Received()
-		return false, err
-	}
-
-	// folder should exist no matter what
-	fpath := t.Path()
-	if err := os.MkdirAll(fpath, os.ModeDir|os.ModePerm); err != nil {
-		log.Println("[ShouldGenerate] failed to create: ", t.Path())
-		log.Println("[ShouldGenerate] failed: ", err)
-		return false, err
-	}
-
-	// see if we already have this tile flagged with a temp file
-	fname := path.Join(fpath, t.Filename()+".req")
-	info, err := os.Stat(fname)
-	if err != nil {
-		return false, err
-	}
-
-	if info != nil {
-		// check its age
-		age := time.Since(info.ModTime())
-		if age > maxAge {
-			// file is old. remove it
-			os.Remove(fpath)
-		} else {
-			// file exists and it has not timed out
-			return false, nil
-		}
-	}
-
-	// the .req file either didn't exist or is older than 24 hours and was deleted above
-	// tell the client to go ahead and re-request it
-	//
-	// we'll create a temporary `.req` file as a flag to indicate we have
-	// already requested the file and it is pending, in case someone comes asking again.
-	f, err := os.Create(fpath)
-	if err != nil {
-		log.Println("[ShouldGenerate] failed to create: ", fpath)
-		log.Println("[ShouldGenerate] failed: ", err)
-		return false, err
-	}
-	defer f.Close()
-
-	return true, nil
-}
-
-// Received is called to remove the temp file that was created when this tile
-// was requested to be generated
-func (t *Tile) Received() {
-	fname := t.Filename() + ".req"
-	fpath := path.Join(t.Path(), fname)
-	if err := os.Remove(fpath); err != nil {
-		log.Println("[tile::Received] could not remove tmp file: ", err)
-		return
-	}
-}
-
 // tileCount is the number of tiles in each direction required to render
 // at the set zoom level
 func (t *Tile) tileCount() float64 {
@@ -278,11 +176,6 @@ func (t *Tile) Save() error {
 	fpath := t.Path()
 	fname := path.Join(fpath, t.Filename())
 
-	data, err := base64.StdEncoding.DecodeString(t.Data)
-	if err != nil {
-		return err
-	}
-
 	// does not return an error if the path exists. creates the path recusively
 	if err := os.MkdirAll(fpath, os.ModeDir|os.ModePerm); err != nil {
 		return err
@@ -294,8 +187,13 @@ func (t *Tile) Save() error {
 	}
 	defer f.Close()
 
-	r := bytes.NewBuffer(data)
-	_, err = io.Copy(f, r)
+	var buf bytes.Buffer
+	enc := gob.NewEncoder(&buf)
+	if err := enc.Encode(t.Data); err != nil {
+		return err
+	}
+
+	_, err = io.Copy(f, &buf)
 	if err != nil {
 		return err
 	}
@@ -303,21 +201,27 @@ func (t *Tile) Save() error {
 	return nil
 }
 
-// NoResample is the error string returned if sampling fails
-const NoResample = "Cannot resample tile. Suitable reference tile(s) don't exist"
+// Load ...
+func (t *Tile) Load() error {
+	fpath := t.Path()
+	fname := path.Join(fpath, t.Filename())
 
-// Downsample looks for a higher resolution tile and samples the iteration data
-// to create a scaled down version.
-//
-// If we cannot downsample, an error is returned.
-func (t *Tile) Downsample() (*Tile, error) {
-	return nil, errors.New(NoResample)
-}
+	if _, err := os.Stat(fname); err == nil {
+		f, err := os.Open(fname)
+		if err != nil {
+			log.Println("Failed to open data file: ", err)
+			return err
+		}
+		defer f.Close()
 
-// Upsample looks for a lower resolution tile and scales it up for a placeholder
-// tile to return to the user while the full resolution tile gets rendered.
-//
-// If we cannot upsample, an error is returned.
-func (t *Tile) Upsample() (*Tile, error) {
-	return nil, errors.New(NoResample)
+		dec := gob.NewDecoder(f)
+		if err := dec.Decode(&t.Data); err != nil {
+			log.Println("Failed to decode data file:", err)
+			return err
+		}
+	} else {
+		err = errors.New("Tile not found")
+	}
+
+	return nil
 }

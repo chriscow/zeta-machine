@@ -3,12 +3,10 @@ package web
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"image"
-	"image/color"
 	"image/png"
 	"io"
 	"io/ioutil"
@@ -32,18 +30,18 @@ var (
 
 // isBlank determines if the tile should be rendered as a blank, solid color tile.
 // Returns true if the response was written and no further action is needed.
-func isBlank(tile *zeta.Tile, w http.ResponseWriter) bool {
-	if tile.IsBackground() || tile.Zoom == -1 {
-		bkg := color.RGBA{0x00, 0x3c, 0xff, 0xff} // background color of website 003cff
+// func isBlank(tile *zeta.Tile, w http.ResponseWriter) bool {
+// 	if tile.IsBackground() || tile.Zoom == -1 {
+// 		bkg := color.RGBA{0x00, 0x3c, 0xff, 0xff} // background color of website 003cff
 
-		img := tile.RenderSolid(bkg)
+// 		img := tile.RenderSolid(bkg)
 
-		writePNG(w, img)
-		return true
-	}
+// 		writePNG(w, img)
+// 		return true
+// 	}
 
-	return false
-}
+// 	return false
+// }
 
 func (s *Server) serveIndex() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -107,36 +105,28 @@ func (s *Server) serveTile() http.HandlerFunc {
 		}
 
 		// don't save tiles that don't contain anything
-		if isBlank(tile, w) {
+		// if isBlank(tile, w) {
+		// 	return
+		// }
+
+		if err := tile.Load(); err != nil {
+			log.Println("Failed to get tile data: ", err)
+			http.Error(w, err.Error(), 404)
 			return
 		}
 
-		redo := r.URL.Query().Get("redo") != ""
-
-		data, err := s.getTileData(tile, redo)
+		// Render the image from the data
+		img, err = tile.Render(palette.DefaultPalette)
 		if err != nil {
-			if err == ErrTileQueued {
-				img = tile.RenderSolid(palette.BackgroundColor)
-			} else {
-				log.Println("Failed to get tile data: ", err)
-				http.Error(w, err.Error(), 500)
-				return
-			}
+			log.Println("Failed to render tile data: ", err)
+			http.Error(w, err.Error(), 500)
+			return
 		}
 
-		// If an image wasn't rendered above, and we have some data ...
-		if img == nil && data != nil {
-			// Render the image from the data
-			img, err = tile.Render(data, palette.DefaultPalette)
-			if err != nil {
-				log.Println("Failed to render tile data: ", err)
-				http.Error(w, err.Error(), 500)
-				return
-			}
+		// for debugging, write out the png to a file
+		saveTmpPNG(tile, img)
 
-			saveTmpPNG(tile, img)
-		}
-
+		// send the png over the wire
 		writePNG(w, img)
 	})
 }
@@ -168,71 +158,6 @@ func saveTmpPNG(tile *zeta.Tile, img image.Image) {
 		log.Println("[saveTmpPNG] failed to copy: ", err, i)
 		return
 	}
-}
-
-func (s *Server) getTileData(tile *zeta.Tile, redo bool) (data []byte, err error) {
-	fpath := tile.Path()
-	fname := path.Join(fpath, tile.Filename())
-
-	if _, err := os.Stat(fname); err == nil && !redo {
-		f, err := os.Open(fname)
-		if err != nil {
-			log.Println("Failed to open data file: ", err)
-			return nil, err
-		}
-		defer f.Close()
-
-		data, err = ioutil.ReadAll(f)
-		if err != nil {
-			log.Println("Failed to read data file: ", err)
-			return nil, err
-		}
-
-	} else {
-
-		// The plan is to only generate tiles for authorized users
-		// TODO: Do an auth check and queue up tile rendering. Return a temp tile
-
-		// Tile data file does not exist.
-
-		// hires, _ := tile.Downsample()
-		// if hires != nil {
-		// 	tile.Data = hires.Data
-		// } else {
-		// 	lowres, _ := tile.Upsample()
-		// }
-
-		// if os.Getenv("ZETA_GENERATE_VIA") == "nsq" {
-		// 	_, err := s.requester.Send(tile)
-		// 	if err != nil {
-		// 		log.Println("[server] Failed to send NSQ generate request: ", err)
-		// 		return nil, err
-		// 	}
-
-		// 	return nil, ErrTileQueued
-
-		// } else {
-		// reqGenHTTP alters the passed in tile with the resulting data
-		if err := reqGenHTTP(tile); err != nil {
-			log.Println("[server] Failed to send HTTP generate request: ", err)
-			return nil, err
-		}
-
-		// Save and decode the data
-		if err := tile.Save(); err != nil {
-			log.Println("Failed to save tile data: ", err)
-			return nil, err
-		}
-
-		data, err = base64.StdEncoding.DecodeString(tile.Data)
-		if err != nil {
-			log.Println("Failed to decode tile data: ", err)
-			return nil, err
-		}
-		// }
-	}
-
-	return data, nil
 }
 
 // A generate request comes as a posted Tile JSON, without the encoded image of course.

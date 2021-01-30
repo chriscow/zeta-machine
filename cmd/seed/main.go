@@ -1,17 +1,15 @@
 package main
 
 import (
+	"errors"
 	"flag"
-	"fmt"
 	"log"
-	"math"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
 	"zetamachine/pkg/msg"
-	"zetamachine/pkg/zeta"
 
 	"github.com/go-chi/valve"
 	"github.com/joho/godotenv"
@@ -24,12 +22,13 @@ var (
 )
 
 func main() {
-	checkEnv()
+	if err := checkEnv(); err != nil {
+		log.Fatal(err)
+	}
 
 	minZoom := flag.Int("min-zoom", 0, "minimum zoom to start checking for missing tiles")
 	zoom := flag.Int("zoom", 4, "maximum zoom level to generate tiles")
 
-	maxAge := flag.Duration("max-age", time.Hour*24*30, "re-request tiles that have not completed if older")
 	role := flag.String("role", "", "store, request, generate")
 	flag.Parse()
 
@@ -73,42 +72,12 @@ func main() {
 	log.Println("[seed] Processes complete.")
 }
 
-func checkEnv() {
+func checkEnv() error {
 	godotenv.Load()
-}
 
-func bulkRequest(minZoom, zoom, limit int, maxAge time.Duration, s msg.Server) {
-	log.Println("requesting tiles for zoom: ", zoom)
-
-	r := s.(*Requester)
-
-	// tileCount := int(math.Pow(2, float64(zoom+1)))
-	for z := minZoom; z <= zoom; z++ {
-
-		requested := 0
-		skipped := 0
-
-		ppu := math.Pow(2, float64(z))
-		units := 1024 / ppu
-
-		for rl := -512.0; rl < 512; rl += units {
-			for im := -4096.0; im < 4096; im += units {
-
-				patch := zeta.NewPatch(complex(rl, im), complex(rl+units, im+units))
-				sent, err := r.Send(patch)
-				if err != nil {
-					log.Fatal(err)
-				}
-
-				if !sent {
-					skipped++
-					continue
-				}
-				requested++
-			}
-		}
-
-		fmt.Println()
-		log.Println("zoom", z, "complete. sent:", requested, "skipped:", skipped)
+	if os.Getenv("ZETA_NSQLOOKUP") == "" {
+		return errors.New("ZETA_NSQLOOKUP is not exported")
 	}
+
+	return nil
 }

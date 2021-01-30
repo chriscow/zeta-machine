@@ -1,6 +1,15 @@
-package zeta
+package seed
 
-const PatchSize = TileWidth * 4
+import (
+	"fmt"
+	"zetamachine/pkg/zeta"
+)
+
+const (
+	PatchWidth = zeta.TileWidth * 4
+	xRange     = 512.0  // in each direction: -512 -> 512
+	yRange     = 4096.0 // same
+)
 
 // Patch is similar to a tile but instead is a larger patch of data that will
 // be split into tiles.  The purpose is to have powerful GPUs calculate much
@@ -8,18 +17,23 @@ const PatchSize = TileWidth * 4
 // a suitable size for display on the web
 type Patch struct {
 	ID   int       `json:"id"`
+	Zoom int       `json:"zoom"`
+	Size uint      `json:"size"`
 	Min  []float64 `json:"min"`
 	Max  []float64 `json:"max"`
-	Size uint      `json:"size"`
 	Data []uint32  `json:"data"`
 }
 
-func NewPatch(min, max complex128) *Patch {
-	p := &Patch{Size: PatchSize}
+func NewPatch(zoom int, min, max complex128) *Patch {
+	p := &Patch{Zoom: zoom, Size: PatchWidth}
 	p.SetMin(min)
 	p.SetMax(max)
 
 	return p
+}
+
+func (p *Patch) String() string {
+	return fmt.Sprint("id:", p.ID, "zoom:", p.Zoom, "min:", p.Min, "max:", p.Max)
 }
 
 func (p *Patch) SetMin(min complex128) {
