@@ -3,12 +3,18 @@ package main
 import (
 	"errors"
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
+	"strings"
+	"path"
 	"time"
+	"context"
 	"zetamachine/pkg/seed"
+	"zetamachine/pkg/palette"
+	"zetamachine/pkg/zeta"
 
 	"github.com/go-chi/valve"
 	"github.com/joho/godotenv"
@@ -40,27 +46,24 @@ func main() {
 	v := valve.New()
 
 	switch *role {
-	// case "make":
-	// 	p := seed.NewPatch(0, 0, complex(-512, -512), complex(512, 512), 0, 0, seed.PatchWidth)
-	// 	p.Generate(context.Background())
-	// 	t := p.ToTile()
-	// 	fname := strings.Replace("patch."+t.Filename(), ".dat", ".png", -1)
-	// 	fpath := path.Join(".", fname)
-	// 	t.SavePNG(palette.DefaultPalette, fpath)
-	// 	fmt.Println("saved patch", fpath)
+	case "make":
+		for x := -1;  x <= 1; x++ {
+			for y := -1; y<= 1; y++ {
+				t := &zeta.Tile{
+					Zoom:  4,
+					X:     x,
+					Y:     y,
+					Width: zeta.TileWidth,
+				}
+				t.ComputeRequest(context.Background())
+				fname := strings.Replace("patch."+t.Filename(), ".dat", ".png", -1)
+				fpath := path.Join(".", fname)
+				t.SavePNG(palette.DefaultPalette, fpath)
+				fmt.Println("saved tile", fpath)
+			}
+		}
 
-	// 	tiles, err := p.Split()
-	// 	if err != nil {
-	// 		log.Fatal(err)
-	// 	}
-
-	// 	for i := range tiles {
-	// 		fname := strings.Replace(tiles[i].Filename(), ".dat", ".png", -1)
-	// 		fpath := path.Join(".", fname)
-	// 		fmt.Println(fpath)
-	// 		tiles[i].SavePNG(palette.DefaultPalette, fpath)
-	// 	}
-	// 	os.Exit(0)
+		os.Exit(0)
 
 	case "req":
 		fallthrough

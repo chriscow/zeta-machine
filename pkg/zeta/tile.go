@@ -81,25 +81,25 @@ func (t *Tile) PPU() int {
 
 // Min returns the lower left coordinate in 'units' this tile renders
 func (t *Tile) Min() complex128 {
-	ppu := t.PPU()
-	r := float64(t.X * ppu)
-	i := float64(t.Y * ppu)
+	units := t.Units()
+	r := float64(t.X) * units
+	i := float64(t.Y) * units
 	return complex(r, i)
 }
 
 // Max returns the upper-right coordinate in 'units' this tile renders
 func (t *Tile) Max() complex128 {
 	min := t.Min()
-	stride := t.Units()
+	units := t.Units()
 
-	r := real(min) + stride
-	i := imag(min) + stride
+	r := real(min) + units
+	i := imag(min) + units
 	return complex(r, i)
 }
 
 // Units is the number of 'units' this tile covers (this is not pixels)
 func (t *Tile) Units() float64 {
-	return float64(t.Width * t.PPU())
+	return float64(t.Width / t.PPU())
 }
 
 // RenderSolid renders a solid color tile of the given color
