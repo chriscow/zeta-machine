@@ -18,7 +18,6 @@ import (
 	"os"
 	"path"
 	"strconv"
-	"strings"
 
 	"github.com/go-chi/chi"
 )
@@ -227,7 +226,7 @@ func (t *Tile) Load() error {
 	return nil
 }
 
-func (t *Tile) SavePNG(colors []color.Color) error {
+func (t *Tile) SavePNG(colors []color.Color, fullpath string) error {
 
 	img, err := t.Render(colors)
 	if err != nil {
@@ -240,18 +239,9 @@ func (t *Tile) SavePNG(colors []color.Color) error {
 		return err
 	}
 
-	fpath := t.Path()
-	// does not return an error if the path exists. creates the path recusively
-	if err := os.MkdirAll(fpath, os.ModeDir|os.ModePerm); err != nil {
-		return err
-	}
-
-	fname := strings.Replace(t.Filename(), ".dat", ".png", -1)
-	fpath = path.Join(fpath, fname)
-
-	f, err := os.Create(fpath)
+	f, err := os.Create(fullpath)
 	if err != nil {
-		log.Println("[saveTmpPNG] failed to open: ", fpath, err)
+		log.Println("[saveTmpPNG] failed to open: ", fullpath, err)
 		return err
 	}
 	defer f.Close()

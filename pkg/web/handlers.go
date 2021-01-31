@@ -12,6 +12,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -122,14 +123,17 @@ func (s *Server) serveTile() http.HandlerFunc {
 		}
 
 		// for debugging, write out the png to a file
-		tile.SavePNG(palette.DefaultPalette)
+		if err := os.MkdirAll(tile.Path(), os.ModeDir|os.ModePerm); err == nil {
+			fname := strings.Replace(tile.Filename(), ".dat", ".png", -1)
+			fpath := path.Join(tile.Path(), fname)
+
+			tile.SavePNG(palette.DefaultPalette, fpath)
+		}
 
 		// send the png over the wire
 		writePNG(w, img)
 	})
 }
-
-
 
 // A generate request comes as a posted Tile JSON, without the encoded image of course.
 // generateTile() uses the posted tile as arguments for generating the image

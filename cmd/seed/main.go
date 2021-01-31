@@ -8,11 +8,12 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"path"
+	"strings"
 	"syscall"
 	"time"
 	"zetamachine/pkg/palette"
 	"zetamachine/pkg/seed"
-	"zetamachine/pkg/zeta"
 
 	"github.com/go-chi/valve"
 	"github.com/joho/godotenv"
@@ -45,11 +46,25 @@ func main() {
 
 	switch *role {
 	case "make":
-		p := seed.NewPatch(0, 0, complex(-30, -30), complex(30, 30), 0, 0, zeta.TileWidth)
+		p := seed.NewPatch(0, 0, complex(-512, -512), complex(512, 512), 0, 0, seed.PatchWidth)
 		p.Generate(context.Background())
 		t := p.ToTile()
-		t.SavePNG(palette.DefaultPalette)
-		fmt.Println("saved ", t.Path(), t.Filename())
+		fname := strings.Replace("patch."+t.Filename(), ".dat", ".png", -1)
+		fpath := path.Join(".", fname)
+		t.SavePNG(palette.DefaultPalette, fpath)
+		fmt.Println("saved patch", fpath)
+
+		tiles, err := p.Split()
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		for i := range tiles {
+			fname := strings.Replace(tiles[i].Filename(), ".dat", ".png", -1)
+			fpath := path.Join(".", fname)
+			fmt.Println(fpath)
+			tiles[i].SavePNG(palette.DefaultPalette, fpath)
+		}
 		os.Exit(0)
 
 	case "req":

@@ -2,6 +2,8 @@ package seed
 
 import (
 	"fmt"
+	"path"
+	"strings"
 	"zetamachine/pkg/palette"
 	"zetamachine/pkg/zeta"
 )
@@ -83,7 +85,9 @@ func (p *Patch) ToTile() *zeta.Tile {
 // SavePNG ...
 func (p *Patch) SavePNG() error {
 	tile := p.ToTile()
-	return tile.SavePNG(palette.DefaultPalette)
+	fname := strings.Replace(tile.Filename(), ".dat", ".png", -1)
+	fpath := path.Join(tile.Path(), fname)
+	return tile.SavePNG(palette.DefaultPalette, fpath)
 }
 
 // Split splits the patch data into individual tiles
@@ -110,34 +114,17 @@ func (p *Patch) Split() ([]*zeta.Tile, error) {
 		}
 
 		for row := 0; row < zeta.TileWidth; row++ {
-			start := i*zeta.TileWidth + row*p.Width
+			// start := i*zeta.TileWidth + row*p.Width
+			start := i*zeta.TileWidth + row*zeta.TileWidth*4
 
 			// copy one row of data from the patch to the tile
 			copy(tiles[i].Data[row*zeta.TileWidth:row*zeta.TileWidth+zeta.TileWidth],
 				p.Data[start:start+zeta.TileWidth])
 		}
-		/*
-			unitsPerPatch = patch.Max[0] - patch.Min[1]
-			unitsPerTile = unitsPerPatch / 4
-
-			patch.X = unitsPerPatch % patch.Max[0]
-			patch.Y = unitsPerPatch % patch.Max[1]
-
-			tile.X = patch.X * 4 + i % 4
-			tile.Y = patch.Y * 4 + i / 4
-			units := p.Max[0] - p.Min[1]
-			unitsPerTile := units / 4 // 4 tiles across, 4 tiles down
-			pixelsPerUnit := int(math.Pow(2, float64(p.Zoom)))
-		*/
 
 		tiles[i].X = p.X*4 + i%4
 		tiles[i].Y = p.Y*4 + i/4
-
-		// x = -4 + i % 4
-		// y = 4 -
-
-		// tile[i].X = int(math.Floor(patch.Min[0] + (i)/float64(PatchWidth)))
-		// tile[i].Y = int(math.Floor(patch.Min[1] / float64(PatchWidth)))
+		fmt.Println("splitting tile ", i, tiles[i].X, tiles[i].Y)
 	}
 
 	return tiles, nil
