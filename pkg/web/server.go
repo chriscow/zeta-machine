@@ -42,7 +42,9 @@ func (s *Server) Run() error {
 	if err := http.ListenAndServe(":"+s.port, r); err != nil {
 		log.Println(err)
 	}
+	log.Print("shutting down ...")
 	s.valve.Shutdown(10 * time.Second)
+	log.Println(" done!")
 	return nil
 }
 
