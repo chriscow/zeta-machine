@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"log"
 	"math"
-	"zetamachine/pkg/zeta"
 
 	"github.com/go-chi/valve"
 
@@ -50,7 +49,7 @@ func (r *Requester) Start() {
 		log.Println("[request] zoom:", r.minZoom, "-", r.maxZoom)
 
 		var count uint64
-		width := zeta.TileWidth
+		width := PatchWidth
 
 		// tileCount := int(math.Pow(2, float64(zoom+1)))
 		for zoom := r.minZoom; zoom <= r.maxZoom; zoom++ {

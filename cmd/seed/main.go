@@ -29,8 +29,8 @@ func main() {
 		log.Fatal(err)
 	}
 
-	minZoom := uint8(*flag.Int("min-zoom", 0, "minimum zoom to start checking for missing tiles"))
-	maxZoom := uint8(*flag.Int("max-zoom", 0, "maximum zoom level to generate tiles"))
+	minZoom := flag.Int("min-zoom", 0, "minimum zoom to start checking for missing tiles")
+	maxZoom := flag.Int("max-zoom", 0, "maximum zoom level to generate tiles")
 
 	role := flag.String("role", "", "make, request, generate")
 	flag.Parse()
@@ -55,7 +55,7 @@ func main() {
 	case "req":
 		fallthrough
 	case "request":
-		server, err = seed.NewRequester(v, minZoom, maxZoom)
+		server, err = seed.NewRequester(v, uint8(*minZoom), uint8(*maxZoom))
 	case "gen":
 		fallthrough
 	case "generate":
