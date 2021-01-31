@@ -19,8 +19,6 @@ import (
 
 func (s *Server) serveIndex() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var zoom int
-		var rl, im float64
 		var err error
 
 		zoom := 4

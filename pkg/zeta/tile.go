@@ -22,7 +22,7 @@ import (
 
 const (
 	// TileWidth is the width of a rendered tile in pixels
-	TileWidth = 1024
+	TileWidth = 512
 )
 
 // Tile holds information for generating a single zeta tile at a particular
