@@ -12,7 +12,7 @@ import (
 
 const (
 	// These are the ranges we want to render
-	xRange = 512.0  // in each direction: -512 -> 512
+	xRange = 25.0  // in each direction: -512 -> 512
 	yRange = 4096.0 // same
 )
 
@@ -61,10 +61,13 @@ func (r *Requester) Start() {
 
 			// handles the case for zoom == 0 because
 			// xRange is less than a single tile, set to whole tile
-			xRange := math.Max(zeta.TileWidth, xRange)
+			xrange := xRange
+			if zoom < 4 {
+				xrange = math.Max(zeta.TileWidth, xRange)
+			}
 
 			// how many patches in each direction
-			xCount := int(xRange / units)
+			xCount := int(xrange / units)
 			yCount := int(yRange / units)
 
 		loop:
