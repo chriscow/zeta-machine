@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"log"
 	"math"
+	"zetamachine/pkg/zeta"
 
 	"github.com/go-chi/valve"
-
 	"github.com/nsqio/go-nsq"
 )
 
@@ -49,7 +49,6 @@ func (r *Requester) Start() {
 		log.Println("[request] zoom:", r.minZoom, "-", r.maxZoom)
 
 		var count uint64
-		width := PatchWidth
 
 		// tileCount := int(math.Pow(2, float64(zoom+1)))
 		for zoom := r.minZoom; zoom <= r.maxZoom; zoom++ {
@@ -58,29 +57,36 @@ func (r *Requester) Start() {
 			skipped := 0
 
 			ppu := math.Pow(2, float64(zoom))
-			units := float64(width) / ppu // units per patch
+			units := float64(zeta.TileWidth) / ppu // units per tile
 
 			// handles the case for zoom == 0 because
-			// xRange is only 512 and that is less than a single patch
-			xr := math.Max(1024, xRange)
+			// xRange is less than a single tile, set to whole tile
+			xRange := math.Max(zeta.TileWidth, xRange)
 
 			// how many patches in each direction
-			xCount := int(xr / units)
+			xCount := int(xRange / units)
 			yCount := int(yRange / units)
 
 		loop:
 			for x := -xCount; x < xCount; x++ {
 				for y := -yCount; y < yCount; y++ {
 
-					rl := -xr + units*float64(x+xCount)
-					im := -yRange + units*float64(y+yCount)
+					// rl := -xr + units*float64(x+xCount)
+					// im := -yRange + units*float64(y+yCount)
 
-					patch := NewPatch(count, zoom, complex(rl, im), complex(rl+units, im+units), x, y, width)
+					t := &zeta.Tile{
+						Zoom:  int(zoom),
+						X:     x,
+						Y:     y,
+						Width: zeta.TileWidth,
+					}
+
+					// (count, zoom, complex(rl, im), complex(rl+units, im+units), x, y, width)
 					count++
 
-					log.Println("[request] patch:", patch)
+					log.Println("[request] tile:", t)
 
-					sent, err := r.send(patch)
+					sent, err := r.send(t)
 					if err != nil {
 						log.Fatal(err)
 					}
@@ -105,7 +111,7 @@ func (r *Requester) Start() {
 }
 
 // Send ...
-func (r *Requester) send(tile *Patch) (bool, error) {
+func (r *Requester) send(tile *zeta.Tile) (bool, error) {
 
 	msg, err := json.Marshal(tile)
 	if err != nil {

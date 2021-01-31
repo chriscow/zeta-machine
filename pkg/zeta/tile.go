@@ -2,9 +2,7 @@ package zeta
 
 import (
 	"bytes"
-	"context"
 	"encoding/gob"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"image"
@@ -23,15 +21,8 @@ import (
 )
 
 const (
-	// TotalUnits represents the number of units we render at 1 pixel per unit
-	// at zoom level zero
-	TotalUnits = 512
-
-	// GlobalMin is the lower left coordinate for 1 tile at 1 pixel per unit
-	GlobalMin = -256 - 256i
-
 	// TileWidth is the width of a rendered tile in pixels
-	TileWidth = 256
+	TileWidth = 1024
 )
 
 // Tile holds information for generating a single zeta tile at a particular
@@ -83,39 +74,16 @@ func RequestToTile(r *http.Request) (*Tile, error) {
 	return t, nil
 }
 
-// ComputeRequest takes a JSON serialized tile, unmarshals it, computes the
-// iteration data, base64 encodes the data and marshals it all back to JSON
-func ComputeRequest(ctx context.Context, b []byte, luts []*LUT) ([]byte, error) {
-	tile := &Tile{}
-	if err := json.Unmarshal(b, tile); err != nil {
-		return nil, err
-	}
-
-	log.Println("[tile] computing: ", tile)
-
-	algo := &Algo{}
-	tile.Data = algo.Compute(ctx, tile.Min(), tile.Max(), tile.Width*tile.Width)
-	log.Println("[tile] compute complete: ", tile)
-
-	return json.Marshal(tile)
-}
-
 // PPU returns the resolution of this tile in pixels per unit
 func (t *Tile) PPU() int {
-	return int(float64(t.Width) / (real(t.Max() - t.Min())))
+	return int(math.Pow(2, float64(t.Zoom)))
 }
 
 // Min returns the lower left coordinate in 'units' this tile renders
 func (t *Tile) Min() complex128 {
-	// Tile count is always even. Tile 0,0 is in the center so tile
-	// numbers can be negative
-	offset := float64(t.tileCount()) / 2
-	x := float64(t.X) + offset
-	y := float64(t.Y) + offset
-	stride := t.Units()
-
-	r := real(GlobalMin) + x*stride
-	i := imag(GlobalMin) + y*stride
+	ppu := t.PPU()
+	r := float64(t.X * ppu)
+	i := float64(t.Y * ppu)
 	return complex(r, i)
 }
 
@@ -131,7 +99,7 @@ func (t *Tile) Max() complex128 {
 
 // Units is the number of 'units' this tile covers (this is not pixels)
 func (t *Tile) Units() float64 {
-	return TotalUnits / t.tileCount()
+	return float64(t.Width * t.PPU())
 }
 
 // RenderSolid renders a solid color tile of the given color
@@ -159,12 +127,6 @@ func (t *Tile) Exists() (os.FileInfo, error) {
 	// see if we already have this tile
 	fname := path.Join(t.Path(), t.Filename())
 	return os.Stat(fname)
-}
-
-// tileCount is the number of tiles in each direction required to render
-// at the set zoom level
-func (t *Tile) tileCount() float64 {
-	return math.Pow(2, float64(t.Zoom+1))
 }
 
 func (t *Tile) String() string {

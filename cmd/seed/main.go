@@ -1,18 +1,13 @@
 package main
 
 import (
-	"context"
 	"errors"
 	"flag"
-	"fmt"
 	"log"
 	"os"
 	"os/signal"
-	"path"
-	"strings"
 	"syscall"
 	"time"
-	"zetamachine/pkg/palette"
 	"zetamachine/pkg/seed"
 
 	"github.com/go-chi/valve"
@@ -33,7 +28,7 @@ func main() {
 	minZoom := flag.Int("min-zoom", 0, "minimum zoom to start checking for missing tiles")
 	maxZoom := flag.Int("max-zoom", 0, "maximum zoom level to generate tiles")
 
-	role := flag.String("role", "", "make, request, generate")
+	role := flag.String("role", "", "request, generate")
 	flag.Parse()
 
 	if *role == "" {
@@ -45,27 +40,27 @@ func main() {
 	v := valve.New()
 
 	switch *role {
-	case "make":
-		p := seed.NewPatch(0, 0, complex(-512, -512), complex(512, 512), 0, 0, seed.PatchWidth)
-		p.Generate(context.Background())
-		t := p.ToTile()
-		fname := strings.Replace("patch."+t.Filename(), ".dat", ".png", -1)
-		fpath := path.Join(".", fname)
-		t.SavePNG(palette.DefaultPalette, fpath)
-		fmt.Println("saved patch", fpath)
+	// case "make":
+	// 	p := seed.NewPatch(0, 0, complex(-512, -512), complex(512, 512), 0, 0, seed.PatchWidth)
+	// 	p.Generate(context.Background())
+	// 	t := p.ToTile()
+	// 	fname := strings.Replace("patch."+t.Filename(), ".dat", ".png", -1)
+	// 	fpath := path.Join(".", fname)
+	// 	t.SavePNG(palette.DefaultPalette, fpath)
+	// 	fmt.Println("saved patch", fpath)
 
-		tiles, err := p.Split()
-		if err != nil {
-			log.Fatal(err)
-		}
+	// 	tiles, err := p.Split()
+	// 	if err != nil {
+	// 		log.Fatal(err)
+	// 	}
 
-		for i := range tiles {
-			fname := strings.Replace(tiles[i].Filename(), ".dat", ".png", -1)
-			fpath := path.Join(".", fname)
-			fmt.Println(fpath)
-			tiles[i].SavePNG(palette.DefaultPalette, fpath)
-		}
-		os.Exit(0)
+	// 	for i := range tiles {
+	// 		fname := strings.Replace(tiles[i].Filename(), ".dat", ".png", -1)
+	// 		fpath := path.Join(".", fname)
+	// 		fmt.Println(fpath)
+	// 		tiles[i].SavePNG(palette.DefaultPalette, fpath)
+	// 	}
+	// 	os.Exit(0)
 
 	case "req":
 		fallthrough

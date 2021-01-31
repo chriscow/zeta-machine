@@ -21,9 +21,11 @@ func Compute(req events.APIGatewayProxyRequest) (*events.APIGatewayProxyResponse
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
-	jsonb, err := zeta.ComputeRequest(ctx, []byte(req.Body), nil)
+	tile.ComputeRequest(ctx)
+
+	jsonb, err := json.Marshal(tile)
 	if err != nil {
-		log.Println("Error computing tile: ", err)
+		log.Println("Error marshalling tile: ", err)
 		return nil, err
 	}
 

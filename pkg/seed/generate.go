@@ -77,19 +77,16 @@ func (s *CudaServer) HandleMessage(msg *nsq.Message) error {
 	}
 	defer s.valve.Close()
 
-	patch := &Patch{}
-	if err := json.Unmarshal(msg.Body, patch); err != nil {
+	t := &zeta.Tile{}
+	if err := json.Unmarshal(msg.Body, t); err != nil {
 		log.Println("[cuda server] Error unmarshalling msg body: ", err)
 		return err
 	}
 
-	// GeneratePatch creates all the patch / tile data
-	// splits the patch into 4 tiles.
-	start := time.Now()
 	ticker := time.NewTicker(utils.TouchSec * time.Second)
 	done := make(chan bool)
 	go func() {
-		patch.Generate(s.valve.Context())
+		t.ComputeRequest(s.valve.Context())
 		close(done)
 	}()
 
@@ -104,27 +101,13 @@ loop:
 		}
 	}
 
-	genTime := time.Since(start)
-
-	patch.SavePNG()
-
-	tiles, err := patch.Split()
-	if err != nil {
-		log.Println("[cuda server] error splitting patch:", err)
-		return err
-	}
-
 	// Publish the 16 tiles for storage.
-	for i := range tiles {
-		if err := s.publishTile(tiles[i]); err != nil {
-			// Move this patch request message to the errors topic
-			if err := s.producer.Publish("patch-errors", msg.Body); err != nil {
-				log.Println("[cuda server] error publishing error message:", err)
-			}
-			break
+	if err := s.publishTile(t); err != nil {
+		// Move this patch request message to the errors topic
+		if err := s.producer.Publish("patch-errors", msg.Body); err != nil {
+			log.Println("[cuda server] error publishing error message:", err)
 		}
 	}
-	log.Println("[cuda server] patch generated in:", genTime, " total time:", time.Since(start))
 
 	return nil
 }
