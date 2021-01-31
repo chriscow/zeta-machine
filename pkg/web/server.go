@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/go-chi/valve"
 
@@ -38,9 +39,11 @@ func (s *Server) Run() error {
 	s.store.Start()
 
 	log.Println("Listening and serving on :" + s.port)
-	if http.ListenAndServe(":"+s.port, r) != nil {
+	if err := http.ListenAndServe(":"+s.port, r); err != nil {
+		log.Println(err)
 	}
-	return err
+	s.valve.Shutdown(10 * time.Second)
+	return nil
 }
 
 func (s *Server) config() error {
