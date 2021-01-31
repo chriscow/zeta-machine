@@ -23,23 +23,9 @@ func (s *Server) serveIndex() http.HandlerFunc {
 		var rl, im float64
 		var err error
 
-		zoom, err = strconv.Atoi(os.Getenv("ZETA_DEFAULT_ZOOM"))
-		if err != nil {
-			http.Error(w, "ZETA_DEFAULT_ZOOM invalid environment: "+err.Error(), 500)
-			return
-		}
-
-		rl, err = strconv.ParseFloat(os.Getenv("ZETA_DEFAULT_REAL"), 64)
-		if err != nil {
-			http.Error(w, "ZETA_DEFAULT_REAL invalid environment: "+err.Error(), 500)
-			return
-		}
-
-		im, err = strconv.ParseFloat(os.Getenv("ZETA_DEFAULT_IMAG"), 64)
-		if err != nil {
-			http.Error(w, "ZETA_DEFAULT_IMAG invalid environment: "+err.Error(), 500)
-			return
-		}
+		zoom := 4
+		rl := 0.0
+		im := 0.0
 
 		if r.URL.Query().Get("zoom") != "" {
 			zoom, err = strconv.Atoi(r.URL.Query().Get("zoom"))

@@ -26,8 +26,12 @@ import "C"
 // Generate tile data via call to cuda zeta machine library
 func (t *Tile) ComputeRequest(ctx context.Context) {
 	start := time.Now()
-	buf := make([]C.uint, p.Width*p.Width)
-	C.generate(C.double(p.Min[0]), C.double(p.Max[0]), C.double(p.Min[1]), C.double(p.Max[1]), C.uint(p.Width), &buf[0])
+	buf := make([]C.uint, t.Width*t.Width)
+	min := t.Min()
+	max := t.Max()
+	C.generate(C.double(real(min)), C.double(real(max)), 
+		C.double(imag(min)), C.double(imag(max)), 
+		C.uint(t.Width), &buf[0])
 
 	t.Data = make([]uint16, len(buf))
 	for i := range buf {
