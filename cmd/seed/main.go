@@ -4,12 +4,15 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+	"zetamachine/pkg/palette"
 	"zetamachine/pkg/seed"
+	"zetamachine/pkg/zeta"
 
 	"github.com/go-chi/valve"
 	"github.com/joho/godotenv"
@@ -42,9 +45,11 @@ func main() {
 
 	switch *role {
 	case "make":
-		p := seed.NewPatch(0, 0, complex(-30, -30), complex(30, 30), 0, 0, seed.PatchWidth)
+		p := seed.NewPatch(0, 0, complex(-30, -30), complex(30, 30), 0, 0, zeta.TileWidth)
 		p.Generate(context.Background())
-		p.SavePNG()
+		t := p.ToTile()
+		t.SavePNG(palette.DefaultPalette)
+		fmt.Println("saved ", t.Path(), t.Filename())
 		os.Exit(0)
 
 	case "req":

@@ -102,9 +102,9 @@ type Algo struct {
 }
 
 // Compute ...
-func (a *Algo) Compute(ctx context.Context, min, max complex128, size int) []uint16 {
+func (a *Algo) Compute(ctx context.Context, min, max complex128, tileWidth int) []uint16 {
 	// a.ppu = int(float64(TileWidth) / (real(max - min)))
-	a.data = make([]uint16, size)
+	a.data = make([]uint16, tileWidth*tileWidth)
 	a.wg = &sync.WaitGroup{}
 
 	stride := len(a.data) // / runtime.GOMAXPROCS(0) //TileWidth * TileWidth / 8 // 8 jobs per tile
@@ -118,7 +118,7 @@ func (a *Algo) Compute(ctx context.Context, min, max complex128, size int) []uin
 		}
 
 		a.wg.Add(1)
-		go a.computePatch(ctx, jobID, start, stride, min, max, size)
+		go a.computePatch(ctx, jobID, start, stride, min, max, tileWidth)
 		jobID++
 	}
 

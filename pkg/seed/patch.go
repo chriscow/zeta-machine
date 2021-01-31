@@ -68,16 +68,21 @@ func (p *Patch) GetMax() complex128 {
 	return complex(p.Max[0], p.Max[1])
 }
 
-// SavePNG ...
-func (p *Patch) SavePNG() error {
-	tile := zeta.Tile{
+// ToTile ...
+func (p *Patch) ToTile() *zeta.Tile {
+	tile := &zeta.Tile{
 		Zoom:  int(p.Zoom),
 		X:     p.X,
 		Y:     p.Y,
 		Width: p.Width,
 		Data:  p.Data,
 	}
+	return tile
+}
 
+// SavePNG ...
+func (p *Patch) SavePNG() error {
+	tile := p.ToTile()
 	return tile.SavePNG(palette.DefaultPalette)
 }
 

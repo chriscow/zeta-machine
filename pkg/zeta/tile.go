@@ -248,11 +248,6 @@ func (t *Tile) SavePNG(colors []color.Color) error {
 
 	fname := strings.Replace(t.Filename(), ".dat", ".png", -1)
 	fpath = path.Join(fpath, fname)
-	info, _ := os.Stat(fpath)
-	if info != nil {
-		// exists
-		return nil
-	}
 
 	f, err := os.Create(fpath)
 	if err != nil {

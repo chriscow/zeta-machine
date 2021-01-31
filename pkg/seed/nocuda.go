@@ -10,5 +10,5 @@ import (
 // Generate patch data via call to cuda zeta machine library
 func (p *Patch) Generate(ctx context.Context) {
 	algo := zeta.Algo{}
-	p.Data = algo.Compute(ctx, p.GetMin(), p.GetMax(), p.Width*p.Width)
+	p.Data = algo.Compute(ctx, p.GetMin(), p.GetMax(), p.Width)
 }
