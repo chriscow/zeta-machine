@@ -1,19 +1,19 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
 	"log"
 	"os"
 	"os/signal"
-	"syscall"
-	"strings"
 	"path"
+	"strings"
+	"syscall"
 	"time"
-	"context"
-	"zetamachine/pkg/seed"
 	"zetamachine/pkg/palette"
+	"zetamachine/pkg/seed"
 	"zetamachine/pkg/zeta"
 
 	"github.com/go-chi/valve"
@@ -47,8 +47,8 @@ func main() {
 
 	switch *role {
 	case "make":
-		for x := -1;  x <= 1; x++ {
-			for y := -1; y<= 1; y++ {
+		for x := -1; x <= 1; x++ {
+			for y := -1; y <= 1; y++ {
 				t := &zeta.Tile{
 					Zoom:  4,
 					X:     x,
@@ -68,7 +68,7 @@ func main() {
 	case "req":
 		fallthrough
 	case "request":
-		server, err = seed.NewRequester(v, uint8(*minZoom), uint8(*maxZoom))
+		server, err = seed.NewRequester(v, *minZoom, *maxZoom)
 	case "gen":
 		fallthrough
 	case "generate":
