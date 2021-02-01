@@ -125,7 +125,7 @@ func (r *Requester) requestRange(zoom, xCount, yStart, yEnd int) {
 
 			log.Println("[request] tile:", t)
 
-			sent, err := r.send(t)
+			_, err := r.send(t)
 			if err != nil {
 				log.Fatal(err)
 			}
