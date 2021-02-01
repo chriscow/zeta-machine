@@ -56,59 +56,44 @@ func (r *Requester) Start() {
 
 func (r *Requester) requestBulb(zoom int) int {
 	log.Println("[request] -- requesting bulb --")
-	xRange := 30.0
-	yRange := 20.0
+	xRange := math.Max(float64(zeta.TileWidth/zoom/8), 30.0)
+	yRange := math.Max(float64(zeta.TileWidth/zoom/8), 20.0)
 
 	ppu := math.Pow(2, float64(zoom))
 	units := float64(zeta.TileWidth) / ppu // units per tile
 
-	// handles the case for zoom == 0 because
-	// xRange is less than a single tile, set to whole tile
-	xrange := xRange
-	yrange := yRange
-	if zoom < 4 {
-		xrange = math.Max(zeta.TileWidth, xRange)
-		yrange = math.Max(zeta.TileWidth, yRange)
-	}
-
 	// how many patches in each direction
-	xCount := int(xrange / units)
-	yCount := int(yrange / units)
+	xCount := int(math.Max(1, xRange / units))
+	yCount := int(math.Max(1, yRange / units))
 
 	r.requestRange(zoom, xCount, -yCount, yCount)
 	return yCount
 }
 
 func (r *Requester) requestArms(yStart, zoom int) {
-	xRange := 16.0   // in each direction: -512 -> 512
+	xRange := math.Max(float64(zeta.TileWidth/zoom/8), 6.0) 
 	yRange := 4096.0 // same
 
 	ppu := math.Pow(2, float64(zoom))
 	units := float64(zeta.TileWidth) / ppu // units per tile
 
-	// handles the case for zoom == 0 because
-	// xRange is less than a single tile, set to whole tile
-	xrange := xRange
-	yrange := yRange
-	if zoom < 4 {
-		xrange = math.Max(zeta.TileWidth, xRange)
-		yrange = math.Max(zeta.TileWidth, yRange)
-	}
-
 	// how many patches in each direction
-	xCount := int(xrange / units)
-	yCount := int(yrange / units)
+	xCount := int(math.Max(2, xRange / units))
+	yCount := int(math.Max(2, yRange / units))
 
-	log.Println("[request] -- requesting positive arm --")
+	log.Println("[request] -- requesting positive arm -- ", yStart, yCount, " yrange, units", yRange, units)
 	r.requestRange(zoom, xCount, yStart, yCount)
 
-	log.Println("[request] -- requesting negative arm --")
+	log.Println("[request] -- requesting negative arm --", -yCount+1, -yStart)
 	r.requestRange(zoom, xCount, -yCount+1, -yStart) // count and start need reversed
 }
 
-func (r *Requester) requestRange(zoom, xCount, yStart, yEnd int) {
-	log.Println("[request] xrange ", -xCount, " to ", xCount-1)
-	log.Println("[request] yrange ", yStart, " to ", yEnd-1)
+func (r *Requester) requestRange(zoom, xCount, yStart, yEnd int) (int,int) {
+	log.Println("[requestRange] zoom:", zoom, " xrange ", -xCount, " to ", xCount-1)
+	log.Println("\tyrange ", yStart, " to ", yEnd-1)
+
+	sent := 0
+	skipped := 0
 
 	for x := -xCount; x < xCount; x++ {
 		for y := yStart; y < yEnd; y++ {
@@ -123,20 +108,31 @@ func (r *Requester) requestRange(zoom, xCount, yStart, yEnd int) {
 				Width: zeta.TileWidth,
 			}
 
+			info, err := t.Exists()
+			if info != nil {
+				log.Println("[request] skipping. tile exists: ", t)
+				skipped++
+				continue
+			} 
+
 			log.Println("[request] tile:", t)
 
-			_, err := r.send(t)
+			_, err = r.send(t)
 			if err != nil {
 				log.Fatal(err)
 			}
+			sent++
 
 			select {
 			case <-r.valve.Stop(): // valve is being shutdown
-				return
+				return sent, skipped
 			default:
 			}
 		}
 	}
+
+	log.Println("[requestRange] sent:", sent, " skipped:", skipped)
+	return sent, skipped
 }
 
 // Send ...
