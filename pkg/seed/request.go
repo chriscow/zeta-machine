@@ -116,19 +116,19 @@ func (r *Requester) requestRange(zoom, xCount, yStart, yEnd int) {
 			// rl := -xr + units*float64(x+xCount)
 			// im := -yRange + units*float64(y+yCount)
 
-			// t := &zeta.Tile{
-			// 	Zoom:  int(zoom),
-			// 	X:     x,
-			// 	Y:     y,
-			// 	Width: zeta.TileWidth,
-			// }
+			t := &zeta.Tile{
+				Zoom:  int(zoom),
+				X:     x,
+				Y:     y,
+				Width: zeta.TileWidth,
+			}
 
-			// log.Println("[request] tile:", t)
+			log.Println("[request] tile:", t)
 
-			// sent, err := r.send(t)
-			// if err != nil {
-			// 	log.Fatal(err)
-			// }
+			sent, err := r.send(t)
+			if err != nil {
+				log.Fatal(err)
+			}
 
 			select {
 			case <-r.valve.Stop(): // valve is being shutdown
