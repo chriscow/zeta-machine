@@ -114,7 +114,7 @@ func (t *Tile) RenderSolid(bkg color.Color) image.Image {
 
 // Filename returns the filename for this tile
 func (t *Tile) Filename() string {
-	return fmt.Sprintf("%d.%d.%d.dat", t.Zoom, t.Y, t.X)
+	return fmt.Sprintf("%d.%d.%d.dat.gz", t.Zoom, t.Y, t.X)
 }
 
 // Path returns the full relative path to the file
@@ -137,7 +137,7 @@ func (t *Tile) String() string {
 // Save saves the binary iteration data from a tile
 func (t *Tile) Save() error {
 	fpath := t.Path()
-	fname := path.Join(fpath, t.Filename()+".gz")
+	fname := path.Join(fpath, t.Filename())
 
 	// does not return an error if the path exists. creates the path recusively
 	if err := os.MkdirAll(fpath, os.ModeDir|os.ModePerm); err != nil {
@@ -175,7 +175,7 @@ func (t *Tile) Save() error {
 // Load ...
 func (t *Tile) Load() error {
 	fpath := t.Path()
-	fname := path.Join(fpath, t.Filename()+".gz")
+	fname := path.Join(fpath, t.Filename())
 
 	if _, err := os.Stat(fname); err == nil {
 		f, err := os.Open(fname)
@@ -192,30 +192,6 @@ func (t *Tile) Load() error {
 
 		buf := bytes.NewBuffer(b)
 		dec := gob.NewDecoder(buf)
-		if err := dec.Decode(&t.Data); err != nil {
-			log.Println("Failed to decode data file:", err)
-			return err
-		}
-	} else {
-		err = errors.New("Tile not found")
-	}
-
-	return nil
-}
-
-func (t *Tile) LoadUncompressed() error {
-	fpath := t.Path()
-	fname := path.Join(fpath, t.Filename())
-
-	if _, err := os.Stat(fname); err == nil {
-		f, err := os.Open(fname)
-		if err != nil {
-			log.Println("Failed to open data file: ", err)
-			return err
-		}
-		defer f.Close()
-
-		dec := gob.NewDecoder(f)
 		if err := dec.Decode(&t.Data); err != nil {
 			log.Println("Failed to decode data file:", err)
 			return err
