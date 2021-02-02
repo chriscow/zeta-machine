@@ -4,6 +4,7 @@ go 1.15
 
 require (
 	github.com/aws/aws-lambda-go v1.22.0
+	github.com/briandowns/spinner v1.12.0
 	github.com/foolin/goview v0.3.0
 	github.com/go-chi/chi v1.5.1
 	github.com/go-chi/valve v0.0.0-20170920024740-9e45288364f4

@@ -2,6 +2,7 @@ package zeta
 
 import (
 	"bytes"
+	"compress/gzip"
 	"encoding/gob"
 	"errors"
 	"fmt"
@@ -136,7 +137,7 @@ func (t *Tile) String() string {
 // Save saves the binary iteration data from a tile
 func (t *Tile) Save() error {
 	fpath := t.Path()
-	fname := path.Join(fpath, t.Filename())
+	fname := path.Join(fpath, t.Filename()+".gz")
 
 	// does not return an error if the path exists. creates the path recusively
 	if err := os.MkdirAll(fpath, os.ModeDir|os.ModePerm); err != nil {
@@ -149,13 +150,21 @@ func (t *Tile) Save() error {
 	}
 	defer f.Close()
 
+	// convert the []int to []byte
 	var buf bytes.Buffer
 	enc := gob.NewEncoder(&buf)
 	if err := enc.Encode(t.Data); err != nil {
 		return err
 	}
 
-	_, err = io.Copy(f, &buf)
+	comp, err := compress(buf.Bytes())
+	if err != nil {
+		log.Println("failed to compress tile: ", t)
+		return err
+	}
+
+	b := bytes.NewBuffer(comp)
+	_, err = io.Copy(f, b)
 	if err != nil {
 		return err
 	}
@@ -165,6 +174,36 @@ func (t *Tile) Save() error {
 
 // Load ...
 func (t *Tile) Load() error {
+	fpath := t.Path()
+	fname := path.Join(fpath, t.Filename())
+
+	if _, err := os.Stat(fname); err == nil {
+		f, err := os.Open(fname)
+		if err != nil {
+			log.Println("Failed to open data file: ", err)
+			return err
+		}
+		defer f.Close()
+
+		b, err := decompress(f)
+		if err != nil {
+			return err
+		}
+
+		buf := bytes.NewBuffer(b)
+		dec := gob.NewDecoder(buf)
+		if err := dec.Decode(&t.Data); err != nil {
+			log.Println("Failed to decode data file:", err)
+			return err
+		}
+	} else {
+		err = errors.New("Tile not found")
+	}
+
+	return nil
+}
+
+func (t *Tile) LoadUncompressed() error {
 	fpath := t.Path()
 	fname := path.Join(fpath, t.Filename())
 
@@ -215,4 +254,35 @@ func (t *Tile) SavePNG(colors []color.Color, fullpath string) error {
 	}
 
 	return nil
+}
+
+func compress(b []byte) ([]byte, error) {
+	buf := &bytes.Buffer{}
+	w := gzip.NewWriter(buf)
+	_, err := w.Write(b)
+	if err != nil {
+		w.Close()
+		log.Println("[cuda server] Error writing compressed json bytes to buffer:", err)
+		return nil, err
+	}
+	w.Close()
+
+	// log.Println("[cuda server] json size:", len(b), "after gzip:", len(buf.Bytes()))
+	return buf.Bytes(), nil
+}
+
+func decompress(r io.Reader) ([]byte, error) {
+	zr, err := gzip.NewReader(r)
+	if err != nil {
+		return nil, err
+	}
+
+	buf := &bytes.Buffer{}
+	c, err := io.Copy(buf, zr)
+	if err != nil {
+		log.Println("failed to copy decompressed data: ", err, c)
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
 }

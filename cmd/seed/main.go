@@ -9,6 +9,8 @@ import (
 	"os"
 	"os/signal"
 	"path"
+	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -16,6 +18,7 @@ import (
 	"zetamachine/pkg/seed"
 	"zetamachine/pkg/zeta"
 
+	"github.com/briandowns/spinner"
 	"github.com/go-chi/valve"
 	"github.com/joho/godotenv"
 )
@@ -64,7 +67,81 @@ func main() {
 		}
 
 		os.Exit(0)
+	case "comp":
+		fallthrough
+	case "compress":
+		tiles := os.Getenv("ZETA_TILE_PATH")
+		spin := spinner.New(spinner.CharSets[11], 100*time.Millisecond)
+		spin.FinalMSG = "Done!"
+		spin.Start()
+		defer spin.Stop()
 
+		badtiles := make([]string, 0)
+
+		filepath.Walk(tiles, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				log.Fatalf(err.Error())
+			}
+			if info.IsDir() {
+				return nil
+			}
+
+			filetype := info.Name()[len(info.Name())-3:]
+			if filetype == "png" {
+				spin.Suffix = " removing " + info.Name()
+				os.Remove(path)
+				return nil
+			}
+
+			if filetype != "dat" {
+				// fmt.Println("skipping ", info.Name())
+				spin.Suffix = " skipped " + info.Name()
+				return nil
+			}
+
+			tok := strings.Split(info.Name(), ".")
+			zoom, err := strconv.Atoi(tok[0])
+			if err != nil {
+				log.Fatal(err)
+			}
+			y, err := strconv.Atoi(tok[1])
+			if err != nil {
+				log.Fatal(err)
+			}
+			x, err := strconv.Atoi(tok[2])
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			spin.Suffix = " compressing " + info.Name()
+			t := &zeta.Tile{Zoom: zoom, X: x, Y: y}
+			if err := t.LoadUncompressed(); err != nil {
+				badtiles = append(badtiles, path)
+				return nil
+			}
+
+			spin.Suffix = " saving " + info.Name() + ".gz"
+			if err := t.Save(); err != nil {
+				fmt.Println("failed to save ", t)
+				log.Fatal(err)
+			}
+
+			if err := t.Load(); err != nil {
+				log.Fatal(err)
+			}
+
+			spin.Suffix = " removing " + info.Name()
+			os.Remove(path)
+			// fmt.Println("File Name: ", info.Name(), " zoom x y", zoom, x, y)
+
+			return nil
+		})
+
+		fmt.Println("Bad Tiles:")
+		for i := range badtiles {
+			fmt.Println(badtiles[i])
+		}
+		os.Exit(0)
 	case "req":
 		fallthrough
 	case "request":

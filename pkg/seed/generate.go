@@ -1,8 +1,6 @@
 package seed
 
 import (
-	"bytes"
-	"compress/gzip"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -139,19 +137,4 @@ func (s *CudaServer) publishTile(tile *zeta.Tile) error {
 	}
 
 	return nil
-}
-
-func compress(b []byte) ([]byte, error) {
-	buf := &bytes.Buffer{}
-	w := gzip.NewWriter(buf)
-	_, err := w.Write(b)
-	if err != nil {
-		w.Close()
-		log.Println("[cuda server] Error writing compressed json bytes to buffer:", err)
-		return nil, err
-	}
-	w.Close()
-
-	// log.Println("[cuda server] json size:", len(b), "after gzip:", len(buf.Bytes()))
-	return buf.Bytes(), nil
 }
