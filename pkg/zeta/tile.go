@@ -175,7 +175,7 @@ func (t *Tile) Save() error {
 // Load ...
 func (t *Tile) Load() error {
 	fpath := t.Path()
-	fname := path.Join(fpath, t.Filename())
+	fname := path.Join(fpath, t.Filename()+".gz")
 
 	if _, err := os.Stat(fname); err == nil {
 		f, err := os.Open(fname)
@@ -262,12 +262,11 @@ func compress(b []byte) ([]byte, error) {
 	_, err := w.Write(b)
 	if err != nil {
 		w.Close()
-		log.Println("[cuda server] Error writing compressed json bytes to buffer:", err)
+		log.Println("[tile] Error writing compressed json bytes to buffer:", err)
 		return nil, err
 	}
 	w.Close()
 
-	// log.Println("[cuda server] json size:", len(b), "after gzip:", len(buf.Bytes()))
 	return buf.Bytes(), nil
 }
 

@@ -126,12 +126,15 @@ func main() {
 				log.Fatal(err)
 			}
 
+			// verify we can load
 			if err := t.Load(); err != nil {
 				log.Fatal(err)
 			}
 
 			spin.Suffix = " removing " + info.Name()
-			os.Remove(path)
+			if err := os.Remove(path); err != nil {
+				log.Fatal(err)
+			}
 			// fmt.Println("File Name: ", info.Name(), " zoom x y", zoom, x, y)
 
 			return nil
