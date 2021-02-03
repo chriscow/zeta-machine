@@ -21,7 +21,6 @@ type Server struct {
 	port       string
 	subdomains []string
 	valve      *valve.Valve
-	store      *Store
 }
 
 // Run reads the configuration from the environment etc., configures routes and
@@ -35,8 +34,6 @@ func (s *Server) Run() error {
 	if err != nil {
 		return err
 	}
-
-	s.store.Start()
 
 	log.Println("Listening and serving on :" + s.port)
 	if err := http.ListenAndServe(":"+s.port, r); err != nil {
@@ -58,12 +55,6 @@ func (s *Server) config() error {
 	s.subdomains = strings.Split(os.Getenv("ZETA_SUBDOMAINS"), ",")
 	s.valve = valve.New()
 
-	store, err := NewStore(s.valve)
-	if err != nil {
-		return err
-	}
-
-	s.store = store
 	return nil
 }
 

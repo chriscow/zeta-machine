@@ -86,69 +86,7 @@ func main() {
 	case "decomp":
 		fallthrough
 	case "decompress":
-		tiles := os.Getenv("ZETA_TILE_PATH")
-		spin := spinner.New(spinner.CharSets[11], 100*time.Millisecond)
-		spin.FinalMSG = "Done!"
-		spin.Start()
-		defer spin.Stop()
-
-		badtiles := make([]string, 0)
-
-		wg := &sync.WaitGroup{}
-		sem := make(chan bool, runtime.GOMAXPROCS(0))
-
-		spin.Suffix = " loading from " + tiles
-		filepath.Walk(tiles, func(fpath string, info os.FileInfo, err error) error {
-			if err != nil {
-				log.Fatalf(err.Error())
-			}
-
-			if info.IsDir() {
-				return nil
-			}
-
-			filetype := info.Name()[len(info.Name())-3:]
-
-			// delete .png
-			if filetype == "png" {
-				spin.Suffix = " removing " + info.Name()
-				os.Remove(fpath)
-				return nil
-			}
-
-			// skip everything that's not .gz
-			if filetype != ".gz" {
-				// fmt.Println("skipping ", info.Name())
-				spin.Suffix = " skipped " + info.Name()
-				return nil
-			}
-
-			spin.Suffix = " processing " + info.Name()
-			wg.Add(1)
-			sem <- true
-			go func(info os.FileInfo) {
-				tile, err := zeta.TileFromFilename(info.Name())
-				if err != nil {
-					log.Fatal("failed to load tile: ", info.Name(), "\n\t", err)
-				}
-
-				pngName := strings.TrimSuffix(info.Name(), ".dat.gz")
-				tile.SavePNG(palette.DefaultPalette, path.Join(tile.Path(), pngName+".png"))
-				wg.Done()
-				<-sem
-			}(info)
-
-			return nil
-		})
-
-		spin.Suffix = " waiting for saves"
-
-		if len(badtiles) > 0 {
-			fmt.Println("Bad Tiles:")
-			for i := range badtiles {
-				fmt.Println(badtiles[i])
-			}
-		}
+		doDecompress()
 		os.Exit(0)
 	case "req":
 		fallthrough
@@ -158,6 +96,10 @@ func main() {
 		fallthrough
 	case "generate":
 		server, err = seed.NewCudaServer(v)
+	case "sto":
+		fallthrough
+	case "store":
+		server, err = seed.NewStore(v)
 	default:
 		log.Fatal("Unknown role: ", role)
 	}
@@ -249,4 +191,70 @@ func uploadToS3(srcfname, dstfname, bucket string) error {
 	}
 	fmt.Printf("file uploaded to, %s\n", aws.StringValue(&result.Location))
 	return nil
+}
+
+func doDecompress() {
+	tiles := os.Getenv("ZETA_TILE_PATH")
+	spin := spinner.New(spinner.CharSets[11], 100*time.Millisecond)
+	spin.FinalMSG = "Done!"
+	spin.Start()
+	defer spin.Stop()
+
+	badtiles := make([]string, 0)
+
+	wg := &sync.WaitGroup{}
+	sem := make(chan bool, runtime.GOMAXPROCS(0))
+
+	spin.Suffix = " loading from " + tiles
+	filepath.Walk(tiles, func(fpath string, info os.FileInfo, err error) error {
+		if err != nil {
+			log.Fatalf(err.Error())
+		}
+
+		if info.IsDir() {
+			return nil
+		}
+
+		filetype := info.Name()[len(info.Name())-3:]
+
+		// delete .png
+		if filetype == "png" {
+			spin.Suffix = " removing " + info.Name()
+			os.Remove(fpath)
+			return nil
+		}
+
+		// skip everything that's not .gz
+		if filetype != ".gz" {
+			// fmt.Println("skipping ", info.Name())
+			spin.Suffix = " skipped " + info.Name()
+			return nil
+		}
+
+		spin.Suffix = " processing " + info.Name()
+		wg.Add(1)
+		sem <- true
+		go func(info os.FileInfo) {
+			tile, err := zeta.TileFromFilename(info.Name())
+			if err != nil {
+				log.Fatal("failed to load tile: ", info.Name(), "\n\t", err)
+			}
+
+			pngName := strings.TrimSuffix(info.Name(), ".dat.gz")
+			tile.SavePNG(palette.DefaultPalette, path.Join(tile.Path(), pngName+".png"))
+			wg.Done()
+			<-sem
+		}(info)
+
+		return nil
+	})
+
+	spin.Suffix = " waiting for saves"
+
+	if len(badtiles) > 0 {
+		fmt.Println("Bad Tiles:")
+		for i := range badtiles {
+			fmt.Println(badtiles[i])
+		}
+	}
 }

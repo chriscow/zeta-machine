@@ -1,12 +1,17 @@
-package web
+package seed
 
 import (
 	"encoding/json"
 	"log"
+	"path"
 	"runtime"
+	"strings"
+	"time"
+	"zetamachine/pkg/palette"
 	"zetamachine/pkg/utils"
 	"zetamachine/pkg/zeta"
 
+	"github.com/briandowns/spinner"
 	"github.com/go-chi/valve"
 	"github.com/nsqio/go-nsq"
 )
@@ -18,12 +23,14 @@ const (
 // Store handles the storage of completed tiles to local disk
 type Store struct {
 	valve *valve.Valve
+	spin  *spinner.Spinner
 }
 
 // NewStore constructs a new Store instance
 func NewStore(v *valve.Valve) (*Store, error) {
 	s := &Store{
 		valve: v,
+		spin:  spinner.New(spinner.CharSets[43], 200*time.Millisecond),
 	}
 
 	return s, nil
@@ -34,6 +41,13 @@ func (s *Store) Start() {
 	log.Println("[store] starting consumer on ", storeTopic, " `store`")
 	maxInFlight := runtime.GOMAXPROCS(0)
 	go utils.StartConsumer(s.valve.Context(), storeTopic, "store", maxInFlight, s)
+	s.spin.Start()
+	s.spin.Suffix = " waiting for tile"
+}
+
+func (s *Store) Close() error {
+	s.spin.Stop()
+	return nil
 }
 
 // HandleMessage handles completed tiles from the Generator and stores them
@@ -57,11 +71,19 @@ func (s *Store) HandleMessage(m *nsq.Message) error {
 		return err
 	}
 
+	s.spin.Suffix = " saving " + tile.Filename()
 	if err := tile.Save(); err != nil {
 		log.Println("[store] error saving tile: ", err)
 		return err
 	}
 
+	fname := strings.TrimSuffix(tile.Filename(), ".dat.gz")
+	fpath := path.Join(tile.Path(), fname+".png")
+	if err := tile.SavePNG(palette.DefaultPalette, fpath); err != nil {
+		log.Println("[store] error saving tile: ", err)
+	}
+
 	// Returning a non-nil error will automatically send a REQ command to NSQ to re-queue the message.
+	s.spin.Suffix = " waiting for tile"
 	return nil
 }
