@@ -17,6 +17,7 @@ import (
 	"os"
 	"path"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi"
 )
@@ -172,6 +173,37 @@ func (t *Tile) Save() error {
 	return nil
 }
 
+// TileFromFilename is a helper function that parses a tile's info from the
+// filename, then loads it from the standard tile data path.
+func TileFromFilename(fname string) (*Tile, error) {
+	if strings.ContainsAny(fname, "\\/") {
+		return nil, errors.New("File name contains path separators: " + fname)
+	}
+	tok := strings.Split(fname, ".")
+	zoom, err := strconv.Atoi(tok[0])
+	if err != nil {
+		return nil, err
+	}
+	x, err := strconv.Atoi(tok[2])
+	if err != nil {
+		return nil, err
+	}
+	y, err := strconv.Atoi(tok[1])
+	if err != nil {
+		return nil, err
+	}
+
+	t := &Tile{
+		Zoom:  zoom,
+		X:     x,
+		Y:     y,
+		Width: TileWidth,
+	}
+
+	err = t.Load()
+	return t, err
+}
+
 // Load ...
 func (t *Tile) Load() error {
 	fpath := t.Path()
@@ -212,20 +244,20 @@ func (t *Tile) SavePNG(colors []color.Color, fullpath string) error {
 
 	buf := &bytes.Buffer{}
 	if err := png.Encode(buf, img); err != nil {
-		log.Println("[saveTmpPNG] failed to encode: ", err)
+		log.Println("[SavePNG] failed to encode: ", err)
 		return err
 	}
 
 	f, err := os.Create(fullpath)
 	if err != nil {
-		log.Println("[saveTmpPNG] failed to open: ", fullpath, err)
+		log.Println("[SavePNG] failed to open: ", fullpath, err)
 		return err
 	}
 	defer f.Close()
 
 	i, err := io.Copy(f, buf)
 	if err != nil {
-		log.Println("[saveTmpPNG] failed to copy: ", err, i)
+		log.Println("[SavePNG] failed to copy: ", err, i)
 		return err
 	}
 

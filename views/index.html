@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"
         integrity="sha512-xodZBNTC5n17Xt2atTPuE1HxjVMSvLVW9ocqUKLsCC5CXdbqCmblAshOMAS6/keqq/sMZMZ19scR4PsZChSR7A=="
         crossorigin="" />
-    <!-- Make sure you put this AFTER Leaflet's CSS -->
+    <!-- Make sure you put this processingForm Leaflet's CSS -->
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"
         integrity="sha512-XQoYMqMTK8LvdxXYG3nZ448hOEQiglfqkJs1NOQV44cWnUrBc8PkAOcXy20w0vlaXaVUearIOBhiXZ5V3ynxwA=="
         crossorigin=""></script>
@@ -77,16 +77,22 @@
             return document.getElementById(id)
         }
 
-        let post = false,
-            zoom = parseInt('{{.zoom}}'),
-            pos = [parseFloat('{{.imag}}'), parseFloat('{{.real}}')],
+        const urlParams = new URLSearchParams(window.location.search);
+
+        let processingForm = false,
+            zoom = urlParams.get("zoom") ? urlParams.get("zoom") : 4,
+            pos = [
+                urlParams.get("imag") ? urlParams.get("imag") : 0, 
+                urlParams.get("real") ? urlParams.get("real") : 0, 
+            ],
             popping = false
+
 
         const
             low = [Number.MIN_SAFE_INTEGER, -50], // coordinate range for tile layer to just limit +/- 30
             high = [Number.MAX_SAFE_INTEGER, 50],
             bounds = [low, high]
-        tileSize = '{{.tileSize}}'
+        tileSize = '512'
 
 
         const zetaMap = L.map('mapid', {
@@ -99,19 +105,12 @@
         $id("imag").value = pos[0]
         $id("zoom").value = zoom
 
-        // var val = {
-        //     item: Math.random(),
-        //     toString: function(){
-        //         return this.item
-        //     }
-        // }
 
-        L.tileLayer('http://{{.host}}/tile/{z}/{y}/{x}/', {
+        L.tileLayer('http://localhost:8000/tiles/{z}/{y}/{z}.{y}.{x}.png', {
             minZoom: 0,
             maxZoom: 40,
-            errorTileUrl: 'http://{{.host}}/tile/-1/0/0/',
+            errorTileUrl: 'http://localhost:8000/tiles/-1/0/0/',
             tileSize: tileSize,
-            subdomains: '{{.subdomains}}',
             // token: val,
         }).addTo(zetaMap)
 
@@ -148,10 +147,10 @@
             // destination may not be precicely what was asked for but it's 
             // very close.  To avoid confusion, just set the form values
             // to what was actually requested after arrival at the destination.
-            if (post) {
+            if (processingForm) {
                 $id("real").value = pos[1]
                 $id("imag").value = pos[0]
-                post = false
+                processingForm = false
             } else {
                 const center = zetaMap.getCenter()
                 pos = [center.lat, center.lng]
@@ -187,7 +186,7 @@
                 imag = parseFloat($id("imag").value)
 
             pos = [imag, real]
-            post = true
+            processingForm = true
             console.log("pos:", pos)
 
 
