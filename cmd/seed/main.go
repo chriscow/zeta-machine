@@ -203,7 +203,7 @@ func doDecompress() {
 	badtiles := make([]string, 0)
 
 	wg := &sync.WaitGroup{}
-	sem := make(chan bool, runtime.GOMAXPROCS(0))
+	sem := make(chan bool, runtime.GOMAXPROCS(0)*2)
 
 	spin.Suffix = " loading from " + tiles
 	filepath.Walk(tiles, func(fpath string, info os.FileInfo, err error) error {
@@ -217,10 +217,7 @@ func doDecompress() {
 
 		filetype := info.Name()[len(info.Name())-3:]
 
-		// delete .png
 		if filetype == "png" {
-			spin.Suffix = " removing " + info.Name()
-			os.Remove(fpath)
 			return nil
 		}
 
@@ -228,6 +225,15 @@ func doDecompress() {
 		if filetype != ".gz" {
 			// fmt.Println("skipping ", info.Name())
 			spin.Suffix = " skipped " + info.Name()
+			return nil
+		}
+
+		// we have a .gz, see if it's png exists
+		pngName := strings.TrimSuffix(fpath, ".dat.gz") + ".png"
+		inf, err := os.Stat(pngName)
+		if inf != nil {
+			// png exists
+			// spin.Suffix = " png exists " + pngName
 			return nil
 		}
 
