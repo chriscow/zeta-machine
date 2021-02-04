@@ -56,5 +56,9 @@ func checkEnv() error {
 		return errors.New("ZETA_NSQLOOKUP is not exported")
 	}
 
+	if os.Getenv("ZETA_TILE_PATH") == "" {
+		return errors.New("ZETA_TILE_PATH is not exported")
+	}
+
 	return nil
 }

@@ -16,10 +16,11 @@ type Requester struct {
 	valve    *valve.Valve
 	minZoom  int
 	maxZoom  int
+	bulbOnly bool
 }
 
 // NewRequester ...
-func NewRequester(v *valve.Valve, minZoom, maxZoom int) (*Requester, error) {
+func NewRequester(v *valve.Valve, minZoom, maxZoom int, bulbOnly bool) (*Requester, error) {
 	config := nsq.NewConfig()
 	p, err := nsq.NewProducer("127.0.0.1:4150", config)
 	if err != nil {
@@ -32,6 +33,7 @@ func NewRequester(v *valve.Valve, minZoom, maxZoom int) (*Requester, error) {
 		valve:    v,
 		minZoom:  minZoom,
 		maxZoom:  maxZoom,
+		bulbOnly: bulbOnly,
 	}, nil
 }
 
@@ -46,7 +48,10 @@ func (r *Requester) Start() {
 		for zoom := r.minZoom; zoom <= r.maxZoom; zoom++ {
 
 			yCount := r.requestBulb(zoom)
-			r.requestArms(yCount, zoom)
+
+			if !r.bulbOnly {
+				r.requestArms(yCount, zoom)
+			}
 
 			log.Println("zoom:", zoom, " done")
 		}

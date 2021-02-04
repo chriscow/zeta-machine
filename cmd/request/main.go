@@ -12,6 +12,8 @@ import (
 
 	"github.com/go-chi/valve"
 	"github.com/joho/godotenv"
+	"github.com/briandowns/spinner"
+
 )
 
 var (
@@ -27,13 +29,15 @@ func main() {
 
 	minZoom := flag.Int("min-zoom", 0, "minimum zoom to start checking for missing tiles")
 	maxZoom := flag.Int("max-zoom", 0, "maximum zoom level to generate tiles")
-
+	bulbOnly := flag.Bool("bulb-only", true, "only generate the bulb")
 	flag.Parse()
 
 	var err error
 	v := valve.New()
+	spin := spinner.New(spinner.CharSets[43], 100*time.Millisecond)
+	spin.Start()
 
-	server, err := seed.NewRequester(v, *minZoom, *maxZoom)
+	server, err := seed.NewRequester(v, *minZoom, *maxZoom, *bulbOnly)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -42,8 +46,6 @@ func main() {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
-	log.Println("[request] Waiting for signal to exit")
-
 	select {
 	case <-sigChan:
 		log.Println("[request] received termination request")
@@ -51,9 +53,8 @@ func main() {
 		log.Println("[request] process completed")
 	}
 
-	log.Println("[request] Waiting for processes to finish...")
+	spin.Stop()
 	v.Shutdown(10 * time.Second)
-	log.Println("[request] Processes complete.")
 }
 
 func checkEnv() error {
