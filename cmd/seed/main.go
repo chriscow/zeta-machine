@@ -9,17 +9,15 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"os"
-	"os/signal"
 	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 	"zetamachine/pkg/palette"
-	"zetamachine/pkg/seed"
 	"zetamachine/pkg/zeta"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -27,7 +25,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/briandowns/spinner"
-	"github.com/go-chi/valve"
 	"github.com/joho/godotenv"
 )
 
@@ -42,88 +39,35 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// getBucketRegion(context.Background(), "lattice.reticle.pasta")
-	// if err := uploadToS3("D:/public/tiles/0/0/0.0.0.dat.gz", "pasta.zeta.machine/public/tiles/"); err != nil {
-	// 	log.Fatal(err)
-	// }
-	// os.Exit(0)
-
-	minZoom := flag.Int("min-zoom", 0, "minimum zoom to start checking for missing tiles")
-	maxZoom := flag.Int("max-zoom", 0, "maximum zoom level to generate tiles")
-
-	role := flag.String("role", "", "request, generate")
+	zoom := flag.Int("zoom", 0, "zoom to render")
+	minR := flag.Float64("minR", -30.0, "min real")
+	minI := flag.Float64("minI", -30.0, "min imag")
+	maxR := flag.Float64("maxR", 30.0, "max real")
+	maxI := flag.Float64("maxI", 30.0, "max imag")
 	flag.Parse()
 
-	if *role == "" {
-		log.Fatal("Role not specified")
+	ppu := math.Pow(2, float64(*zoom))
+	span := zeta.TileWidth / ppu
+
+	x := *minR / span
+	y := *minI / span
+
+	ctx := context.Background()
+	algo := &zeta.Algo{}
+	data := algo.Compute(ctx, complex(*minR, *minI), complex(*maxR, *maxI), zeta.TileWidth)
+
+	t := &zeta.Tile{
+		Zoom:  *zoom,
+		X:     int(x),
+		Y:     int(y),
+		Width: zeta.TileWidth,
+		Data:  data,
 	}
 
-	var err error
-	var server seed.Starter
-	v := valve.New()
-
-	switch *role {
-	// case "make":
-	// 	for x := -1; x <= 1; x++ {
-	// 		for y := -1; y <= 1; y++ {
-	// 			t := &zeta.Tile{
-	// 				Zoom:  4,
-	// 				X:     x,
-	// 				Y:     y,
-	// 				Width: zeta.TileWidth,
-	// 			}
-	// 			t.ComputeRequest(context.Background())
-	// 			fname := strings.Replace("patch."+t.Filename(), ".dat", ".png", -1)
-	// 			fpath := path.Join(".", fname)
-	// 			t.SavePNG(palette.DefaultPalette, fpath)
-	// 			fmt.Println("saved tile", fpath)
-	// 		}
-	// 	}
-
-	// 	os.Exit(0)
-	case "decom":
-		fallthrough
-	case "decomp":
-		fallthrough
-	case "decompress":
-		doDecompress()
-		os.Exit(0)
-	case "req":
-		fallthrough
-	case "request":
-		server, err = seed.NewRequester(v, *minZoom, *maxZoom)
-	case "gen":
-		fallthrough
-	case "generate":
-		server, err = seed.NewCudaServer(v)
-	case "sto":
-		fallthrough
-	case "store":
-		server, err = seed.NewStore(v)
-	default:
-		log.Fatal("Unknown role: ", role)
-	}
-
-	if err != nil {
-		log.Fatal(err)
-	}
-	server.Start()
-
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-
-	log.Println("[seed] Waiting for signal to exit")
-
-	select {
-	case <-sigChan:
-		log.Println("[seed] received termination request")
-	case <-v.Stop():
-		log.Println("[seed] process completed")
-	}
-
-	log.Println("[seed] Waiting for processes to finish...")
-	v.Shutdown(10 * time.Second)
-	log.Println("[seed] Processes complete.")
+	fname := strings.Replace(t.Filename(), ".dat.gz", ".png", -1)
+	fpath := path.Join(".", fname)
+	t.SavePNG(palette.DefaultPalette, fpath)
+	fmt.Println("saved tile:", fpath)
 }
 
 func checkEnv() error {
