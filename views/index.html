@@ -106,10 +106,10 @@
         $id("zoom").value = zoom
 
 
-        L.tileLayer('http://localhost:8000/tiles/{z}/{y}/{z}.{y}.{x}.png', {
+        L.tileLayer('/public/tiles/{z}/{y}/{z}.{y}.{x}.png', {
             minZoom: 0,
             maxZoom: 40,
-            errorTileUrl: 'http://localhost:8000/tiles/-1/0/0/',
+            errorTileUrl: '/public/tiles/-1/0/0/',
             tileSize: tileSize,
             // token: val,
         }).addTo(zetaMap)
