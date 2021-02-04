@@ -14,6 +14,6 @@ func (t *Tile) ComputeRequest(ctx context.Context) {
 
 	start := time.Now()
 	algo := &Algo{}
-	t.Data = algo.Compute(ctx, t.Min(), t.Max(), t.Width*t.Width)
+	t.Data = algo.Compute(ctx, t.Min(), t.Max(), t.Width)
 	log.Println("[tile] compute complete in ", time.Since(start), t)
 }

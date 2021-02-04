@@ -2,6 +2,7 @@ package seed
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"path"
 	"runtime"
@@ -30,7 +31,7 @@ type Store struct {
 func NewStore(v *valve.Valve) (*Store, error) {
 	s := &Store{
 		valve: v,
-		spin:  spinner.New(spinner.CharSets[43], 200*time.Millisecond),
+		spin:  spinner.New(spinner.CharSets[43], 100*time.Millisecond),
 	}
 
 	return s, nil
@@ -39,10 +40,10 @@ func NewStore(v *valve.Valve) (*Store, error) {
 // Start ...
 func (s *Store) Start() {
 	log.Println("[store] starting consumer on ", storeTopic, " `store`")
-	maxInFlight := runtime.GOMAXPROCS(0)
+	maxInFlight := runtime.GOMAXPROCS(0) * 2
 	go utils.StartConsumer(s.valve.Context(), storeTopic, "store", maxInFlight, s)
 	s.spin.Start()
-	s.spin.Suffix = " waiting for tile"
+	s.spin.Suffix = fmt.Sprintf(" saving tiles maxInFlight: %d", maxInFlight)
 }
 
 func (s *Store) Close() error {
@@ -71,7 +72,7 @@ func (s *Store) HandleMessage(m *nsq.Message) error {
 		return err
 	}
 
-	s.spin.Suffix = " saving " + tile.Filename()
+	// s.spin.Suffix = " saving " + tile.Filename()
 	if err := tile.Save(); err != nil {
 		log.Println("[store] error saving tile: ", err)
 		return err
@@ -79,11 +80,12 @@ func (s *Store) HandleMessage(m *nsq.Message) error {
 
 	fname := strings.TrimSuffix(tile.Filename(), ".dat.gz")
 	fpath := path.Join(tile.Path(), fname+".png")
+	s.spin.Suffix = " saving png " + fpath
 	if err := tile.SavePNG(palette.DefaultPalette, fpath); err != nil {
 		log.Println("[store] error saving tile: ", err)
 	}
 
 	// Returning a non-nil error will automatically send a REQ command to NSQ to re-queue the message.
-	s.spin.Suffix = " waiting for tile"
+	// s.spin.Suffix = " waiting for tile"
 	return nil
 }

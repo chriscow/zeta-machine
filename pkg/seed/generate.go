@@ -117,12 +117,6 @@ func (s *CudaServer) publishTile(tile *zeta.Tile) error {
 		return err
 	}
 
-	// json, err = compress(json)
-	// if err != nil {
-	// 	log.Println("[cuda server] Error compressing tile:", err)
-	// 	return err
-	// }
-
 	// If the compressed tile is still too large, publish the original
 	// request to the `patch-errors` topic and move on
 	if len(json) > nsqMaxMsgSize {
