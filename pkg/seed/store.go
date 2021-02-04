@@ -17,8 +17,6 @@ import (
 	"github.com/nsqio/go-nsq"
 )
 
-// aws s3 sync ./9 s3://pasta.zeta.machine/public/tiles/9 --dryrun --size-only
-
 const (
 	storeTopic = "patch-response"
 )
