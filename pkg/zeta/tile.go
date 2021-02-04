@@ -77,8 +77,8 @@ func RequestToTile(r *http.Request) (*Tile, error) {
 }
 
 // PPU returns the resolution of this tile in pixels per unit
-func (t *Tile) PPU() int {
-	return int(math.Pow(2, float64(t.Zoom)))
+func (t *Tile) PPU() float64 {
+	return math.Pow(2, float64(t.Zoom))
 }
 
 // Min returns the lower left coordinate in 'units' this tile renders
@@ -101,7 +101,7 @@ func (t *Tile) Max() complex128 {
 
 // Units is the number of 'units' this tile covers (this is not pixels)
 func (t *Tile) Units() float64 {
-	return float64(t.Width / t.PPU())
+	return float64(t.Width) / t.PPU()
 }
 
 // RenderSolid renders a solid color tile of the given color
