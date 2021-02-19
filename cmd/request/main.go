@@ -10,10 +10,9 @@ import (
 	"time"
 	"zetamachine/pkg/seed"
 
+	"github.com/briandowns/spinner"
 	"github.com/go-chi/valve"
 	"github.com/joho/godotenv"
-	"github.com/briandowns/spinner"
-
 )
 
 var (
