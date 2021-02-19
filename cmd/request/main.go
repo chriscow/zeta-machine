@@ -31,6 +31,8 @@ func main() {
 	bulbOnly := flag.Bool("bulb-only", true, "only generate the bulb")
 	flag.Parse()
 
+	log.Println("min-zoom:", *minZoom, "max-zoom:", *maxZoom, "bulb only: ", *bulbOnly)
+
 	var err error
 	v := valve.New()
 	spin := spinner.New(spinner.CharSets[43], 100*time.Millisecond)
