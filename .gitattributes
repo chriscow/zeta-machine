@@ -1,0 +1,3 @@
+bitmap.hpp linguist-vendored
+*.vcxproj linguist-generated
+*.vcxproj.user linguist-generated
