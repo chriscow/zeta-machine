@@ -35,18 +35,18 @@ func main() {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
-	log.Println("[seed] Waiting for signal to exit")
+	log.Println("[store] Waiting for signal to exit")
 
 	select {
 	case <-sigChan:
-		log.Println("[seed] received termination request")
+		log.Println("[store] received termination request")
 	case <-v.Stop():
-		log.Println("[seed] process completed")
+		log.Println("[store] process completed")
 	}
 
-	log.Println("[seed] Waiting for processes to finish...")
+	log.Println("[store] Shutting down ...")
 	v.Shutdown(10 * time.Second)
-	log.Println("[seed] Processes complete.")
+	log.Println("[store] Processes complete.")
 }
 
 func checkEnv() error {

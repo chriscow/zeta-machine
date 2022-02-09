@@ -53,6 +53,9 @@ func checkEnv() error {
 	if os.Getenv("ZETA_NSQLOOKUP") == "" {
 		return errors.New("ZETA_NSQLOOKUP is not exported")
 	}
+	if os.Getenv("ZETA_NSQD") == "" {
+		return errors.New("ZETA_NSQD is not exported")
+	}
 
 	return nil
 }

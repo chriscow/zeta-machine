@@ -1,3 +1,4 @@
+# give Github language stats a hint that I didn't write these
 bitmap.hpp linguist-vendored
 *.vcxproj linguist-generated
 *.vcxproj.user linguist-generated

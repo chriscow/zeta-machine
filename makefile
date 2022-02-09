@@ -6,7 +6,7 @@ clean:
 	rm -rf $(OUTDIR)
 
 cuda: lut
-	nvcc -o $(OUTDIR)/zeta_machine cuda/main.cu cuda/zeta.cu
+	nvcc -o $(OUTDIR)/zeta_gen generate/main.cu cuda/zeta.cu
 
 web: 
 	go build -o $(OUTDIR)/zeta_web ./cmd/web/.

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"time"
 	"zetamachine/pkg/utils"
 	"zetamachine/pkg/zeta"
@@ -45,7 +46,7 @@ type CudaServer struct {
 func NewCudaServer(v *valve.Valve) (*CudaServer, error) {
 
 	config := nsq.NewConfig()
-	p, err := nsq.NewProducer("127.0.0.1:4150", config)
+	p, err := nsq.NewProducer(os.Getenv("ZETA_NSQD"), config)
 	if err != nil {
 		log.Fatal("Could not connect to nsqd: ", err)
 	}

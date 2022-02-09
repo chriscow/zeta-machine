@@ -2,8 +2,8 @@ package utils
 
 import (
 	"context"
-	"os"
 	"errors"
+	"os"
 
 	"github.com/nsqio/go-nsq"
 )
@@ -41,7 +41,7 @@ func StartConsumer(ctx context.Context, topic, channel string, maxInFlight int, 
 
 	// Use nsqlookupd to discover nsqd instances.
 	// See also ConnectToNSQD, ConnectToNSQDs, ConnectToNSQLookupds.
-	err = consumer.ConnectToNSQLookupd(os.Getenv("ZETA_NSQLOOKUP") + ":4161")
+	err = consumer.ConnectToNSQLookupd(os.Getenv("ZETA_NSQLOOKUP"))
 	// err = consumer.ConnectToNSQD("localhost:4150")
 	if err != nil {
 		return err

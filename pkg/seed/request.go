@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"math"
+	"os"
 	"zetamachine/pkg/zeta"
 
 	"github.com/go-chi/valve"
@@ -22,7 +23,7 @@ type Requester struct {
 // NewRequester ...
 func NewRequester(v *valve.Valve, minZoom, maxZoom int, bulbOnly bool) (*Requester, error) {
 	config := nsq.NewConfig()
-	p, err := nsq.NewProducer("127.0.0.1:4150", config)
+	p, err := nsq.NewProducer(os.Getenv("ZETA_NSQD"), config)
 	if err != nil {
 		log.Println("[requester] could not connect to nsqd: ", err)
 		return nil, err
@@ -59,6 +60,8 @@ func (r *Requester) Start() {
 	}()
 }
 
+// requestBulb is a helper that requests tiles around the bulb area in the middle
+// of the display near the origin. It is only valid for zoom levels of 1 or greater.
 func (r *Requester) requestBulb(zoom int) int {
 	log.Println("[request] -- requesting bulb --")
 	xRange := math.Max(float64(zeta.TileWidth/zoom/8), 30.0)
@@ -68,23 +71,26 @@ func (r *Requester) requestBulb(zoom int) int {
 	units := float64(zeta.TileWidth) / ppu // units per tile
 
 	// how many patches in each direction
-	xCount := int(math.Max(1, xRange / units))
-	yCount := int(math.Max(1, yRange / units))
+	xCount := int(math.Max(1, xRange/units))
+	yCount := int(math.Max(1, yRange/units))
 
 	r.requestRange(zoom, xCount, -yCount, yCount)
 	return yCount
 }
 
+// requestArms is a helper to request tiles for the arms extending from the bulb
+// in the imaginary axis. It is hard coded to only go to +/- 4096 on the 
+// imaginary axis.
 func (r *Requester) requestArms(yStart, zoom int) {
-	xRange := math.Max(float64(zeta.TileWidth/zoom/8), 6.0) 
+	xRange := math.Max(float64(zeta.TileWidth/zoom/8), 6.0)
 	yRange := 4096.0 // same
 
 	ppu := math.Pow(2, float64(zoom))
 	units := float64(zeta.TileWidth) / ppu // units per tile
 
 	// how many patches in each direction
-	xCount := int(math.Max(2, xRange / units))
-	yCount := int(math.Max(2, yRange / units))
+	xCount := int(math.Max(2, xRange/units))
+	yCount := int(math.Max(2, yRange/units))
 
 	log.Println("[request] -- requesting positive arm -- ", yStart, yCount, " yrange, units", yRange, units)
 	r.requestRange(zoom, xCount, yStart, yCount)
@@ -93,7 +99,10 @@ func (r *Requester) requestArms(yStart, zoom int) {
 	r.requestRange(zoom, xCount, -yCount+1, -yStart) // count and start need reversed
 }
 
-func (r *Requester) requestRange(zoom, xCount, yStart, yEnd int) (int,int) {
+// requestRange generates request messages for tiles. Tiles are numbered in the
+// x and y directions. The number of tiles in the x-direction (the real axis)
+// are from -xCount to xCount-1
+func (r *Requester) requestRange(zoom, xCount, yStart, yEnd int) (int, int) {
 	log.Println("[requestRange] zoom:", zoom, " xrange ", -xCount, " to ", xCount-1)
 	log.Println("\tyrange ", yStart, " to ", yEnd-1)
 
@@ -118,7 +127,7 @@ func (r *Requester) requestRange(zoom, xCount, yStart, yEnd int) (int,int) {
 				log.Println("[request] skipping. tile exists: ", t)
 				skipped++
 				continue
-			} 
+			}
 
 			log.Println("[request] tile:", t)
 

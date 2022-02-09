@@ -26,12 +26,20 @@ func main() {
 		log.Fatal(err)
 	}
 
-	minZoom := flag.Int("min-zoom", 0, "minimum zoom to start checking for missing tiles")
-	maxZoom := flag.Int("max-zoom", 0, "maximum zoom level to generate tiles")
+	minZoom := flag.Int("min-zoom", 1, "minimum zoom to start checking for missing tiles")
+	maxZoom := flag.Int("max-zoom", 1, "maximum zoom level to generate tiles")
 	bulbOnly := flag.Bool("bulb-only", true, "only generate the bulb")
 	flag.Parse()
 
-	log.Println("min-zoom:", *minZoom, "max-zoom:", *maxZoom, "bulb only: ", *bulbOnly)
+	log.Println("Arguments  min-zoom:", *minZoom, "max-zoom:", *maxZoom, "bulb only: ", *bulbOnly)
+
+	if *minZoom <= 0 {
+		log.Fatal("min-zoom must be greater than zero")
+	}
+
+	if *maxZoom <= 0 {
+		log.Fatal("max-zoom must be greater than zero")
+	}
 
 	var err error
 	v := valve.New()
@@ -65,5 +73,8 @@ func checkEnv() error {
 		return errors.New("ZETA_NSQLOOKUP is not exported")
 	}
 
+	if os.Getenv("ZETA_NSQD") == "" {
+		return errors.New("ZETA_NSQD is not exported")
+	}
 	return nil
 }
