@@ -25,7 +25,7 @@ storage.
 By rendering patches at different zoom levels we can then turn the whole thing into
 a map that can be scrolled and zoomed.
 
-Everything is hosted as a static website
+Everything is hosted as a static website at [https://zeta-machine.chriscowherd.com](https://zeta-machine.chriscowherd.com)
 
 ## Building & Running
 
