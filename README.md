@@ -1,5 +1,7 @@
 # The Zeta Machine
 
+![Zeta Machine Bulb](https://zeta-machine.chriscowherd.com/public/sample.png)
+
 The [Zeta Machine](http://zeta-machine.chriscowherd.com) generates fractal-like 
 iteration imagery of the [Riemann Zeta function](https://en.wikipedia.org/wiki/Riemann_zeta_function) 
 using a distributed system of GPUs across cloud resources. 
