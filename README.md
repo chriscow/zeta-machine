@@ -1,8 +1,9 @@
 # The Zeta Machine
 
 The [Zeta Machine](http://zeta-machine.chriscowherd.com) generates fractal-like 
-iteration imagery of the Riemann Zeta function using a distributed system of GPUs 
-across cloud resources. The infrastructure and plumbing are all written in Go and 
+iteration imagery of the [Riemann Zeta function](https://en.wikipedia.org/wiki/Riemann_zeta_function) 
+using a distributed system of GPUs across cloud resources. 
+The infrastructure and plumbing are all written in Go and 
 the rendering is done in Cuda if you are running on an Cuda-enabled NVidia GPU. 
 If you are not using a Cuda-enabled GPU, the algorithms are also written in Go 
 and are rendered in software.
