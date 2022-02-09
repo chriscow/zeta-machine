@@ -1,12 +1,12 @@
 # The Zeta Machine
 
-![Zeta Machine Bulb](https://zeta-machine.chriscowherd.com/public/sample.png)
+![Zeta Machine Bulb](https://zeta-machine.chriscowherd.com/public/bulb.png)
 
 The [Zeta Machine](http://zeta-machine.chriscowherd.com) generates fractal-like 
 iteration imagery of the [Riemann Zeta function](https://en.wikipedia.org/wiki/Riemann_zeta_function) 
 using a distributed system of GPUs across cloud resources. 
 
-![Riemann Zeta Function](https://wikimedia.org/api/rest_v1/media/math/render/svg/a171e24fc1c6d990c65e7fe82805613da4645645)
+![Riemann Zeta Function](https://zeta-machine.chriscowherd.com/public/riemann-zeta-function.png)
 
 The infrastructure and plumbing are all written in Go and 
 the rendering is done in Cuda if you are running on an Cuda-enabled NVidia GPU. 
