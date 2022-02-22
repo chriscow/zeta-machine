@@ -1,6 +1,7 @@
 # The Zeta Machine
 
 ![Zeta Machine Bulb](https://zeta-machine.chriscowherd.com/public/bulb.png)
+See it here: [http://zeta-machine.chriscowherd.com/](http://zeta-machine.chriscowherd.com/)
 
 The [Zeta Machine](http://zeta-machine.chriscowherd.com) generates fractal-like 
 iteration imagery of the [Riemann Zeta function](https://en.wikipedia.org/wiki/Riemann_zeta_function) 
