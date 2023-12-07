@@ -1,6 +1,6 @@
 # The Zeta Machine
 
-![Zeta Machine Bulb](https://zeta-machine.chriscowherd.com/public/bulb.png)
+![Zeta Machine Bulb](http://zeta-machine.chriscowherd.com/public/bulb.png)
 
 See it here: [http://zeta-machine.chriscowherd.com/](http://zeta-machine.chriscowherd.com/)
 
@@ -8,7 +8,7 @@ The [Zeta Machine](http://zeta-machine.chriscowherd.com) generates fractal-like
 iteration imagery of the [Riemann Zeta function](https://en.wikipedia.org/wiki/Riemann_zeta_function) 
 using a distributed system of GPUs across cloud resources. 
 
-![Riemann Zeta Function](https://zeta-machine.chriscowherd.com/public/riemann-zeta-function-sm.png)
+![Riemann Zeta Function](http://zeta-machine.chriscowherd.com/public/riemann-zeta-function-sm.png)
 
 The infrastructure and plumbing are all written in Go and 
 the rendering is done in Cuda if you are running on an Cuda-enabled NVidia GPU. 
@@ -32,7 +32,7 @@ storage.
 By rendering patches at different zoom levels we can then turn the whole thing into
 a map that can be scrolled and zoomed.
 
-Everything is hosted as a static website at [https://zeta-machine.chriscowherd.com](https://zeta-machine.chriscowherd.com)
+Everything is hosted as a static website at [http://zeta-machine.chriscowherd.com](https://zeta-machine.chriscowherd.com)
 
 ## Building & Running
 
